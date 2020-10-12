@@ -19,11 +19,16 @@ class UWB_Lidar_Position :
     def __init__(self) :
         '''
             Init node, subscribe to position data
-        ''' 
+        '''
         # Init node
-        rospy.init_node("UWB_and_Lidar_Positioning", anonymous=False)
+        rospy.init_node("UWB_Lidar_VIO_Positioning", anonymous=False)
 
-        
+        self.uwb_topic = rospy.get_param('~uwb_topic', "/dwm1001/tag/dronie/position")
+        self.vio_topic = rospy.get_param('~vio_topic', "/camera/odom/sample")
+        self.lid_topic = rospy.get_param('~lidar_topic', "/tfmini_ros_node/range")
+
+        self.mavros_output_topic = rospy.get_param('~output_topic', "/mavros/vision_pose/pose")
+
         self.lidarz = 0
         self.orientation_x = 0
         self.orientation_y = 0
@@ -31,18 +36,18 @@ class UWB_Lidar_Position :
         self.orientation_w = 1
 
         # Publish data
-        self.local_pos_pub      = rospy.Publisher('/mavros/vision_pose/pose', PoseStamped, queue_size=10)
+        self.local_pos_pub = rospy.Publisher(self.mavros_output_topic, PoseStamped, queue_size=10)
 
         # Subscribe to pose topics
-        self.uwb_subscriber = rospy.Subscriber("/dwm1001/tag/drone/position", Pose, self.uwb_cb)
-        self.lidar_subscriber = rospy.Subscriber("/tfmini_ros_node/TFmini", Range, self.lidar_cb)
+        self.uwb_subscriber = rospy.Subscriber(self.uwb_topic, Pose, self.uwb_cb)
+        self.lidar_subscriber = rospy.Subscriber(self.lid_topic, Range, self.lidar_cb)
+        self.vio_subscriber = rospy.Subscriber(self.vio_topic, Odometry, self.vio_cb)
 
-        
 
     def run(self) :
         '''
             Infinite loop with 20 Hz sleep
-        ''' 
+        '''
         # Set Rospy rate
         rate = rospy.Rate(20.0)
 
@@ -77,7 +82,8 @@ class UWB_Lidar_Position :
             Update ground truth position
         '''
         self.lidarz = pos.range
-        
+
+
     def vio_cb(self, odom) :
         '''
             Update orientation from VIO

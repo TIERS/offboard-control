@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>offboard-control</name>
+  <name>offboard_control</name>
   <version>0.0.0</version>
   <description>The offboard-control package</description>
 
