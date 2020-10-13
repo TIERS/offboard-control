@@ -7,13 +7,15 @@
     <param name="tag_name" type="string" value="dronie" />
   </node>
 
-  <include file="$(find realsense2_camera)/launch/rs_t265.launch" />
-
   <node pkg="offboard_control" type="uwb_lidar_vio_to_mavros" name="uwb_lidar_vio_to_mavros" output="screen">
     <param name="uwb_topic" type="string" value="/dwm1001/tag/dronie/position" />
     <param name="vio_topic" type="string" value="/camera/odom/sample" />
     <param name="lidar_topic" type="string" value="/tfmini_ros_node/range" />
     <param name="output_topic" type="string" value="/mavros/vision_pose/pose" />
   </node>
+
+  <include file="$(find mavros)/launch/px4.launch" />
+
+  <include file="$(find realsense2_camera)/launch/rs_t265.launch" />
 
 </launch>
