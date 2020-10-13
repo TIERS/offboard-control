@@ -24,7 +24,7 @@ from mavros_msgs.srv 	import CommandTOL
 from mavros_msgs.srv 	import CommandBool
 
 # Define fly time (poses at 20Hz, 800 = 40 seconds)
-FLY_TIME = 800
+FLY_TIME = 400
 
 class Offboard_Control() :
 
@@ -51,11 +51,13 @@ class Offboard_Control() :
 		self.next_pos = PoseStamped()
 
 		# First subscribe only to local pos published to make sure we can go to position mode
-		self.local_pos_sub = rospy.Subscriber('/uav0/mavros/local_position/pose', PoseStamped, self.update_current_pos_cb)
+		self.local_pos_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.update_current_pos_cb)
 
 		# Give some time to update current pos
 		sleep(1)
 		self.home_pos = self.pos
+		print("Home position: {}".format(self.pos))
+		#exit()
 
 		# Configurable variables
 		self.config_vars = {
