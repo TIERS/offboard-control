@@ -41,3 +41,16 @@ roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
 
 ## Run using UWB (VIO optional) for localization
 
+To run a simple example, you can use the `safe_offboard` script which by default hovers the drone 1.2m over its starting position. It uses UWB for positioning (tfmini lidar for z) and VIO for orientation. Does not use by dedault VIO to smooth the UWB positioning. Running the px4 and realsense t265 launch files from within the same launch file causes problems with the connections to the rostore. To avoid that, first open a terminal and start a roscore:
+
+```
+source ~/offboard_ws/devel/setup.bash
+roscore
+```
+
+and then in a second terminal
+
+```
+source ~/offboard_ws/devel/setup.bash
+roslaunch offboard_control uwb_lidar_pos.launch
+```
