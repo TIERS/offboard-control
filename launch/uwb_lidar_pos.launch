@@ -16,6 +16,16 @@
 
   <include file="$(find mavros)/launch/px4.launch" />
 
-  <include file="$(find realsense2_camera)/launch/rs_t265.launch" />
+  <!--  
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"     value="t265" />
+    <arg name="serial_no"  value="947122110535" />
+  </include>
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"     value="d435" /> 
+    <arg name="serial_no"  value="938422071231" />
+    <arg name="filters"    value="pointcloud" />
+  </include>
+  -->
 
 </launch>
