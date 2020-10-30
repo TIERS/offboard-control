@@ -41,16 +41,37 @@ roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
 
 ## Run using UWB (VIO optional) for localization
 
-To run a simple example, you can use the `safe_offboard` script which by default hovers the drone 1.2m over its starting position. It uses UWB for positioning (tfmini lidar for z) and VIO for orientation. Does not use by dedault VIO to smooth the UWB positioning. Running the px4 and realsense t265 launch files from within the same launch file causes problems with the connections to the rostore. To avoid that, first open a terminal and start a roscore:
+To run a simple example, you can use the `safe_offboard` script which by default hovers the drone 1.2m over its starting position. It uses UWB for positioning (tfmini lidar for `z`) and VIO for orientation. Does not use by dedault VIO to smooth the UWB positioning.
 
+To start the `dwm1001` interface, `tf-mini` and `mavros`, run:
 ```
-source ~/offboard_ws/devel/setup.bash
-roscore
-```
-
-and then in a second terminal
-
-```
-source ~/offboard_ws/devel/setup.bash
 roslaunch offboard_control uwb_lidar_pos.launch
 ```
+
+then start the T265 camera
+```
+roslaunch offboard_control t265.launch
+```
+
+and optionally the RealSense D435 with
+```
+roslaunch offboard_control d435.launch
+```
+
+You will need to specify the `serial_no` paramerer (serial number) in both cases. Alternatively, the T265 can be launched with
+```
+roslaunch realsense2_camera rs_t265.launch
+```
+
+The serial numbers can be obtained by connecting one camera at a time and launching
+```
+roslaunch realsense2_camera rs_camera.launch
+```
+which will automatically detect the camera and output the corresponding serial number.
+
+
+## Contact
+
+For any questions, write to `jopequ@utu.fi`.
+
+Visit us at [https://tiers.utu.fi](https://tiers.utu.fi)
