@@ -9,9 +9,9 @@
 
   <node pkg="offboard_control" type="uwb_lidar_vio_to_mavros" name="uwb_lidar_vio_to_mavros" output="screen">
     <param name="uwb_topic" type="string" value="/dwm1001/tag/dronie/position" />
-    <param name="vio_topic" type="string" value="/camera/odom/sample" />
-    <param name="lidar_topic" type="string" value="/tfmini_ros_node/range" />
-    <param name="output_topic" type="string" value="/mavros/vision_pose/pose" />
+    <param name="vio_topic" type="string" value="/uav/camera/odom/sample" />
+    <param name="lidar_topic" type="string" value="/uav/tfmini_ros_node/range" />
+    <param name="output_topic" type="string" value="/uav/mavros/vision_pose/pose" />
   </node>
 
   <include file="$(find mavros)/launch/px4.launch" />

@@ -1,9 +1,18 @@
 <launch>
 
-  <include file="$(find realsense2_camera)/launch/rs_camera.launch">                                               ││ Avail: ■■■■■■ 2.82 GiB │ efi             510 MiB ││ 3675 gnome-software  /usr/bin/gn   4 bot     3.1 ⡀⡀⡀⡀⡀  0.0 │
-    <arg name="camera"     value="d435" />                                                                         ││ Cache: ■■■■■■  638 MiB │ Used:  ■■■■■■  6.01 MiB ││ 1192 gnome-shell     /usr/bin/gn  15 bot     3.9 ⡀⡀⡀⡀⡀  0.0 │
-    <arg name="serial_no"  value="938422071231" />                                                                 ││ Free:  ■■■■■■ 2.34 GiB │ Free:  ■■■■■■   504 MiB ││ 1732 mosh-server     mosh-server   1 bot     0.1 ⡀⡀⡀⡀⡀  0.3 │
-    <arg name="filters"    value="pointcloud" />                                                                   ││ Swap:         1.32 GiB │                         ││    1 systemd         /sbin/init    1 root    0.2 ⡀⡀⡀⡀⡀  0.0 │
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"     value="d435" />
+    <arg name="serial_no"  value="938422071231" /> 
+    <arg name="filters"    value="pointcloud" />
+    <arg name="pointcloud_texture_stream" default="RS2_STREAM_ANY"/>
+    <arg name="enable_pointcloud"         default="true"/>
+    <arg name="enable_color"        default="false"/>
+    <arg name="enable_depth"        default="true"/>
+    <arg name="enable_infra2"        default="false"/>
+    <arg name="enable_infra1"        default="false"/>
+    <arg name="align_depth"         default="false"/>
+    <arg name="depth_width"         default="640"/>
+    <arg name="depth_height"        default="480"/>
   </include>          
 
 </launch>

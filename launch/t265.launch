@@ -1,8 +1,12 @@
 <launch>
 
-  <include file="$(find realsense2_camera)/launch/rs_camera.launch">                                               │└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-    <arg name="camera"     value="t265" />                                                                         │┌─┤mem├──────────────────┬─┤disks├─────────────────┐┌─┤processes├─┤filter├──────────┤reverse├┤tree├┤‹ cpu lazy ›├─┐
-    <arg name="serial_no"  value="947122110535" />                                                                 ││ Memory:       3.70 GiB │ root           28.4 GiB ││ Pid: Program:        Arguments:  Tr: User:  Mem%      ▼Cpu% │
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"     value="t265" />
+    <arg name="serial_no"  value="947122110535" />
+    <arg name="enable_color"        default="false"/>
+    <arg name="enable_depth"        default="false"/>
+    <arg name="enable_infra2"        default="false"/>
+    <arg name="enable_infra1"        default="false"/>
   </include>
 
 </launch>
