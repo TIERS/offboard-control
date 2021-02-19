@@ -31,6 +31,7 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
     set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
     emergency_land_server_ = nh_.advertiseService("/uav/emergency_land", &safe_offboard::emergency_srv_cb, this);
+    flight_mode_sub_ = nh_.subscribe<std_msgs::String>("/offboard/mode", 10, &safe_offboard::mode_cb, this);
 }
 
 safe_offboard::~safe_offboard()
@@ -39,6 +40,31 @@ safe_offboard::~safe_offboard()
 
 void safe_offboard::state_cb(const mavros_msgs::State::ConstPtr& msg){
     current_state_ = *msg;
+}
+
+void safe_offboard::mode_cb(const std_msgs::String::ConstPtr& msg)
+{
+    if (msg->data == "land")
+    {
+        flight_mode_ = "land";
+    }
+    if (msg->data == "stay")
+    {
+        flight_mode_ = "stay";
+    }
+    if (msg->data == "hover")
+    {
+        flight_mode_ = "hover";
+    }
+    if (msg->data == "circle")
+    {
+        flight_mode_ = "circle";
+    }
+    if (msg->data == "external_control")
+    {
+        flight_mode_ = "external_control";
+    }
+    
 }
 
  bool safe_offboard::emergency_srv_cb(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response){
@@ -78,12 +104,12 @@ bool safe_offboard::check_ext_position(){
 }
 
 bool safe_offboard::check_inside_fly_fence(double x, double y, double z){
-    bool lower_flag = (x-fly_fence_.lower_point.x) > 0 &&
-                      (y-fly_fence_.lower_point.y) > 0 && 
-                      (z-fly_fence_.lower_point.z) > 0;
-    bool upper_flag = (x-fly_fence_.upper_point.x) < 0 && 
-                      (y-fly_fence_.upper_point.y) < 0 && 
-                      (z-fly_fence_.upper_point.z) < 0;
+    bool lower_flag = (x-fly_fence_.lower_point.x) >= 0 &&
+                      (y-fly_fence_.lower_point.y) >= 0 && 
+                      (z-fly_fence_.lower_point.z) >= 0;
+    bool upper_flag = (x-fly_fence_.upper_point.x) <= 0 && 
+                      (y-fly_fence_.upper_point.y) <= 0 && 
+                      (z-fly_fence_.upper_point.z) <= 0;
     return lower_flag && upper_flag;
 }
 
@@ -112,49 +138,60 @@ void safe_offboard::update_external_waypoint(const geometry_msgs::PoseStamped::C
 }
 
 void safe_offboard::update_current_objective(){
-    next_external_waypoint_ = home_pos_;
+    next_waypoint_ = home_pos_;
 
     if (!current_state_.armed) 
     {
         taken_off_ = false;
+        next_waypoint_.header.stamp = ros::Time::now();
         // do nothing (already set to home pos)
     }
     else if (current_state_.armed && !taken_off_ &&
             current_pos_.pose.position.z < takeoff_height_ - 0.2)
     {
-        next_external_waypoint_.pose.orientation.z = takeoff_height_;
-        taken_off_ = true; // TODO
+        next_waypoint_.pose.orientation.z = takeoff_height_;
+        next_waypoint_.header.stamp = ros::Time::now();
+        
+        if (current_pos_.pose.position.z > takeoff_height_ - 0.2) {
+            taken_off_ = true;
+        }
+        
     }
     else 
     {
-
+        if (flight_mode_ == "land")
+        {
+            next_waypoint_ = current_pos_;
+            next_waypoint_.pose.position.z = 0;
+            next_waypoint_.header.stamp = ros::Time::now();
+        }
         if (flight_mode_ == "stay")
         {
-            next_external_waypoint_.pose.position.z = takeoff_height_;
-            next_external_waypoint_.header.stamp = ros::Time::now();
+            next_waypoint_.pose.position.z = takeoff_height_;
+            next_waypoint_.header.stamp = ros::Time::now();
         }
         else if (flight_mode_ == "hover")
         {
-            next_external_waypoint_ = current_pos_;
-            next_external_waypoint_.header.stamp = ros::Time::now();
+            next_waypoint_ = current_pos_;
+            next_waypoint_.header.stamp = ros::Time::now();
         }
         else if (flight_mode_ == "circle")
         {
             double theta = atan2(current_pos_.pose.position.y, current_pos_.pose.position.x);
             double new_theta = fmod(theta + 0.5, 2*M_PI);
-            next_external_waypoint_.pose.position.x = cos(new_theta)*circle_radius_;
-            next_external_waypoint_.pose.position.y = sin(new_theta)*circle_radius_;
-            next_external_waypoint_.pose.position.z = takeoff_height_;
+            next_waypoint_.pose.position.x = cos(new_theta)*circle_radius_;
+            next_waypoint_.pose.position.y = sin(new_theta)*circle_radius_;
+            next_waypoint_.pose.position.z = takeoff_height_;
 
-            next_external_waypoint_.pose.orientation.x = 0;
-            next_external_waypoint_.pose.orientation.y = 0;
-            next_external_waypoint_.pose.orientation.z = 0;
-            next_external_waypoint_.pose.orientation.w = 1;
-            next_external_waypoint_.header.stamp = ros::Time::now();      
+            next_waypoint_.pose.orientation.x = 0;
+            next_waypoint_.pose.orientation.y = 0;
+            next_waypoint_.pose.orientation.z = 0;
+            next_waypoint_.pose.orientation.w = 1;
+            next_waypoint_.header.stamp = ros::Time::now();      
         }
         else if (flight_mode_ == "external_control")
         {
-            next_external_waypoint_ = next_external_waypoint_;
+            next_waypoint_ = next_external_waypoint_;
         }
     }
     
@@ -167,19 +204,19 @@ void safe_offboard::update_current_objective(geometry_msgs::PoseStamped& objecti
 void safe_offboard::set_flight_mode(std::string flight_mode)
 {
     flight_mode_ = flight_mode;
-    ROS_INFO_STREAM("Flight Mode Is " << flight_mode_);
+    ROS_INFO_STREAM("Set Flight Mode Is " << flight_mode_);
 }
 
 void safe_offboard::set_takeoff_height(double takeoff_height)
 {
     takeoff_height_ = takeoff_height;
-    ROS_INFO_STREAM("Takeoff Height Is " << takeoff_height_);
+    ROS_INFO_STREAM("Set Takeoff Height Is " << takeoff_height_);
 }
 
 void safe_offboard::set_circle_radius(double circle_radius)
 {
     circle_radius_ = circle_radius;
-    ROS_INFO_STREAM("Circle Radius Is " << circle_radius_);
+    ROS_INFO_STREAM("Set Circle Radius Is " << circle_radius_);
 } 
 
 void safe_offboard::set_home_pos(geometry_msgs::PoseStamped& pose)
@@ -196,6 +233,9 @@ void safe_offboard::set_lower_fly_fence(double x, double y, double z)
     fly_fence_.lower_point.x = x;
     fly_fence_.lower_point.y = y;
     fly_fence_.lower_point.z = z;
+    ROS_INFO_STREAM("Set Lower Fly Fence to (" << fly_fence_.lower_point.x << " , "
+                << fly_fence_.lower_point.y << " , "
+                << fly_fence_.lower_point.z << ")");
 }
 
 void safe_offboard::set_upper_fly_fence(double x, double y, double z)
@@ -203,6 +243,9 @@ void safe_offboard::set_upper_fly_fence(double x, double y, double z)
     fly_fence_.upper_point.x = x;
     fly_fence_.upper_point.y = y;
     fly_fence_.upper_point.z = z;
+    ROS_INFO_STREAM("Set Upper Fly Fence to (" << fly_fence_.upper_point.x << " , "
+            << fly_fence_.upper_point.y << " , "
+            << fly_fence_.upper_point.z << ")");
 } 
 
 
@@ -214,27 +257,31 @@ void safe_offboard::check_poses(const ros::TimerEvent& event)
     if((ros::Time::now() - current_pos_.header.stamp) > ros::Duration(pos_valid_time_)) 
     {
         //Land if timestamp is very old
-        next_external_waypoint_.pose.position.z = 0.0;
+        ROS_INFO_STREAM(">>>>>> Out of Position Valid Time <<<<<<");
+        next_waypoint_.pose.position.z = 0.0;
     }
     //check the waypoint is old or not
-    else if((ros::Time::now() - next_external_waypoint_.header.stamp) > ros::Duration(waypoint_valid_time_)) 
+    else if((ros::Time::now() - next_waypoint_.header.stamp) > ros::Duration(waypoint_valid_time_)) 
     {
         //Home if it is very old
-        next_external_waypoint_ = home_pos_;
+        ROS_INFO_STREAM(">>>>>> Out of Waypoint Valid Time <<<<<<");
+        next_waypoint_ = home_pos_;
     }
     // check the waypoint is out of range or not
-    else if(!check_inside_fly_fence(next_external_waypoint_.pose.position.x, 
-        next_external_waypoint_.pose.position.y, next_external_waypoint_.pose.position.z)) 
+    else if(!check_inside_fly_fence(next_waypoint_.pose.position.x, 
+        next_waypoint_.pose.position.y, next_waypoint_.pose.position.z)) 
     {
-        next_external_waypoint_.pose.position.z = 0.0; //
+        ROS_INFO_STREAM(">>>>>> Out of Fly Fence, Next Waypoint Is " << 
+                        next_waypoint_.pose.position.x << " , " <<
+                        next_waypoint_.pose.position.y << " , " <<
+                        next_waypoint_.pose.position.z << " <<<<<<");
+        next_waypoint_.pose.position.z = 0.0; //
     }
-    waypoint_pub_.publish(next_external_waypoint_);
+    waypoint_pub_.publish(next_waypoint_);
 }
 
 
 void safe_offboard::run(){
-    //TODO: Check the run flow
-
     //the setpoint publishing rate MUST be faster than 2Hz required by offboard mode
     ros::Rate rate(20.0);
     
@@ -266,27 +313,26 @@ void safe_offboard::run(){
     ros::Time last_request = ros::Time::now();
 
     while(ros::ok()){
-		if( current_state_.mode != "OFFBOARD" &&
-				(ros::Time::now() - last_request > ros::Duration(2.0))){
-				if( set_mode_client_.call(offb_set_mode_) &&
-						offb_set_mode_.response.mode_sent){
-						ROS_INFO_STREAM("Offboard Enabled");
-				}
-				last_request = ros::Time::now();
-		} else {
-				if( !current_state_.armed &&
-						(ros::Time::now() - last_request > ros::Duration(2.0))){
-						if( arming_client_.call(arm_cmd_) &&
-								arm_cmd_.response.success){
-								ROS_INFO_STREAM("Vehicle Armed");
-						}
-						last_request = ros::Time::now();
-				}
-                // else if(current_state_.armed){
+		// if( current_state_.mode != "OFFBOARD" &&
+		// 		(ros::Time::now() - last_request > ros::Duration(2.0))){
+		// 		if( set_mode_client_.call(offb_set_mode_) &&
+		// 				offb_set_mode_.response.mode_sent){
+		// 				ROS_INFO_STREAM("Offboard Enabled");
+		// 		}
+		// 		last_request = ros::Time::now();
+		// } else {
+		// 		if( !current_state_.armed &&
+		// 				(ros::Time::now() - last_request > ros::Duration(2.0))){
+		// 				if( arming_client_.call(arm_cmd_) &&
+		// 						arm_cmd_.response.success){
+		// 						ROS_INFO_STREAM("Vehicle Armed");
+		// 				}
+		// 				last_request = ros::Time::now();
+		// 		}
+        //         // else if(current_state_.armed){
                     
-                // }
-		}
-
+        //         // }
+		// }
         // 
         ros::spinOnce();
 		rate.sleep();
@@ -314,12 +360,12 @@ int main(int argc, char **argv)
     double waypoint_valid_time;
     std::vector<double> fly_fence{-1.0, -1.0, 0.0, 1.0, 1.0, 1.0};
 
-    nh.param<double>("safe_offboard/takeoff_height", takeoff_height, 1.23);
-    nh.param<double>("safe_offboard/circle_radius", circle_radius, 1.23);
-    nh.param<std::string>("safe_offboard/flight_mode", flight_mode, std::string("stay"));
-    nh.param<double>("safe_offboard/pos_valid_time", pos_valid_time, 1.0);
-    nh.param<double>("safe_offboard/waypoint_valid_time", waypoint_valid_time, 1.0);
-    nh.getParam("safe_offboard/fly_fence",fly_fence);
+    nh.param<double>("takeoff_height", takeoff_height, 1.23);
+    nh.param<double>("circle_radius", circle_radius, 1.23);
+    nh.param<std::string>("flight_mode", flight_mode, std::string("stay"));
+    nh.param<double>("pos_valid_time", pos_valid_time, 1.0);
+    nh.param<double>("waypoint_valid_time", waypoint_valid_time, 1.0);
+    nh.getParam("fly_fence",fly_fence);
 
 
     safe_offboard so = safe_offboard(n);
