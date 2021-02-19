@@ -31,9 +31,7 @@ class Offboard_Control() :
 	def __init__(self) :
 		'''
 			Init offboard control mode
-
 			Checks that local position is being published and drone can go to position mode
-
 			Sets publishers and subscribers
 		'''
 		
@@ -83,7 +81,6 @@ class Offboard_Control() :
 	def _check_ext_positioning(self) :
 		'''
 			Checks that external positioning is working.
-
 			TODO: Land if pose is delayed from at some of the sources
 			TODO: MQTT message
 			
@@ -205,10 +202,8 @@ class Offboard_Control() :
 	def update_current_objective(self) :
 		'''
 			Updates objective position
-
 			By default, the drone goes to home position + fixed height (stay mode)
 			Then, depending on flight_mode :
-
 				"stay"		: stay above home position at takeoff_height
 				"hover" 	: keep current position (might drift...)
 				"circle"	: do a circle of radius circle_radius

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(offboard_control)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -107,7 +107,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+ INCLUDE_DIRS include
 #  LIBRARIES offboard-control
 #  CATKIN_DEPENDS geometry_msgs mavros mavros_msgs roscpp rospy std_msgs
 #  DEPENDS system_lib
@@ -119,15 +119,23 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
+include_directories(${YAMLCPP_INCLUDE_DIRS})
+
+
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/offboard-control.cpp
+# add_library(position_to_mavros
+#   src/position_to_mavros.cpp
 # )
+
+# add_library(safe_offboard
+#   src/safe_offboard.cpp
+# )
+
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -137,8 +145,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/offboard-control_node.cpp)
-
+add_executable(position_to_mavros_node src/position_to_mavros.cpp)
+add_executable(safe_offboard_node src/safe_offboard.cpp)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -152,7 +160,26 @@ include_directories(
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
+#   # position_to_mavros
+#   # safe_offboard
+#   ${YAMLCPP_LIBRARIES}
 # )
+target_link_libraries(position_to_mavros_node
+  ${catkin_LIBRARIES}
+  # position_to_mavros
+  # safe_offboard
+  # ${YAMLCPP_LIBRARIES}
+)
+
+target_link_libraries(safe_offboard_node
+  ${catkin_LIBRARIES}
+  # position_to_mavros
+  # safe_offboard
+  # ${YAMLCPP_LIBRARIES}
+)
+
+
+
 
 #############
 ## Install ##
