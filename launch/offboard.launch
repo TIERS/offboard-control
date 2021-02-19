@@ -7,7 +7,6 @@
 
 <node name="safe_offboard" pkg="offboard_control" type="safe_offboard_node" respawn="true" output="screen">
     <rosparam file="$(find offboard_control)/config/offboard_params.yaml" command="load"/>
-    <!--<param name="my_integer" type="int" value="7" /-->
 </node>
 
 

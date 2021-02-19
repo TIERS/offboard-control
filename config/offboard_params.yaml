@@ -9,7 +9,7 @@ safe_offboard:
   fly_time: 40
   flight_mode: "stay"
   takeoff_height: 1.0
-  circle_radius: 3.0
+  circle_radius: 0.6
   pos_valid_time: 1.0
   waypoint_valid_time: 1.0
   fly_fence: [-1.5, -1.5, 0.0, 1.5, 1.5, 1.5]

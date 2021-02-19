@@ -6,6 +6,7 @@
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
 #include <std_srvs/SetBool.h>
+#include <std_msgs/String.h>
 
 
 struct point
@@ -32,6 +33,8 @@ private:
 
     ros::Subscriber position_cb_;
 
+    ros::Subscriber flight_mode_sub_;
+
     ros::Subscriber external_waypoint_cb_;
 
     ros::Publisher waypoint_pub_;
@@ -50,6 +53,9 @@ private:
     geometry_msgs::PoseStamped current_objective_;
 
     geometry_msgs::PoseStamped next_external_waypoint_; 
+
+
+    geometry_msgs::PoseStamped next_waypoint_; 
 
     geometry_msgs::PoseStamped home_pos_;
 
@@ -79,6 +85,8 @@ public:
 
 public:
     void state_cb(const mavros_msgs::State::ConstPtr& msg);
+
+    void mode_cb(const std_msgs::String::ConstPtr& msg);
 
     bool emergency_srv_cb(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response);
 
