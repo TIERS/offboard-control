@@ -23,9 +23,7 @@ class UWB_Lidar_Position :
         # Init node
         rospy.init_node("UWB_Lidar_VIO_Positioning", anonymous=False)
 
-        self.uwb_topic = rospy.get_param('~uwb_topic', "/dwm1001/tag/dronie/position")
         self.vio_topic = rospy.get_param('~vio_topic', "/uav/camera/odom/sample")
-        self.lid_topic = rospy.get_param('~lidar_topic', "/uav/tfmini_ros_node/range")
 
         self.mavros_output_topic = rospy.get_param('~output_topic', "/uav/mavros/vision_pose/pose")
 
@@ -39,8 +37,6 @@ class UWB_Lidar_Position :
         self.local_pos_pub = rospy.Publisher(self.mavros_output_topic, PoseStamped, queue_size=10)
 
         # Subscribe to pose topics
-        self.uwb_subscriber = rospy.Subscriber(self.uwb_topic, Pose, self.uwb_cb)
-        self.lidar_subscriber = rospy.Subscriber(self.lid_topic, Range, self.lidar_cb)
         self.vio_subscriber = rospy.Subscriber(self.vio_topic, Odometry, self.vio_cb)
 
 
@@ -92,6 +88,19 @@ class UWB_Lidar_Position :
         self.orientation_y = odom.pose.pose.orientation.y
         self.orientation_z = odom.pose.pose.orientation.z
         self.orientation_w = odom.pose.pose.orientation.w
+
+	pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.pose.position.x = odom.pose.pose.position.x
+        pose.pose.position.y = odom.pose.pose.position.y
+        pose.pose.position.z = odom.pose.pose.position.z
+
+        pose.pose.orientation.x = self.orientation_x
+        pose.pose.orientation.y = self.orientation_y
+        pose.pose.orientation.z = self.orientation_z
+        pose.pose.orientation.w = self.orientation_w
+
+        self.local_pos_pub.publish(pose)
 
 
 if __name__ == '__main__':
