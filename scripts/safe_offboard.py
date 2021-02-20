@@ -52,7 +52,10 @@ class Offboard_Control() :
 		self.local_pos_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.update_current_pos_cb)
 
 		# Give some time to update current pos
-		sleep(1)
+		sys.stdout.write('Waiting for (mavros) local pos lock...")
+        while not self.pos.header.stamp :
+            sys.stdout.write('..')
+            sys.stdout.flush()
 		self.home_pos = self.pos
 		print("Home position: {}".format(self.pos))
 		#exit()
