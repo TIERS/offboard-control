@@ -42,6 +42,9 @@ safe_offboard::~safe_offboard()
 
 void safe_offboard::state_cb(const mavros_msgs::State::ConstPtr& msg){
     current_state_ = *msg;
+    if ( current_state_.armed && offboard_state_ == "disarmed") {
+        offboard_state_ = "armed";
+    }
 }
 
 void safe_offboard::mode_cb(const std_msgs::String::ConstPtr& msg)
