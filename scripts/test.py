@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 # license removed for brevity
 import sys
+import time
 import rospy
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 
 def offboard_test():
 
+    print("Starting...")
     rospy.init_node('test_offboard', anonymous=False)
 
     pub_mode = rospy.Publisher('/offboard/mode', String, queue_size=10)
@@ -14,7 +16,11 @@ def offboard_test():
 
     mode = String()
     mode.data = "external_control"
-    pub_mode.publish(mode)
+    print("Publishing...")
+    for i in range(2) :
+        print(i)
+        time.sleep(0.5)
+        pub_mode.publish(mode)
     
     rate = rospy.Rate(10) # 10hz
     cnt = 0
@@ -29,17 +35,15 @@ def offboard_test():
         goalMsg.pose.position.x = 1.2
         goalMsg.pose.position.y = 0
         goalMsg.pose.position.z = 1
-        
-        pub_pose.publish(goalMsg)
 
         cnt += 1
         if cnt > 100 :
-            sys.stdout.write("\rTesting VOI safety fence now...")
-            for i in range(100,cnt) :
-                sys.stdout.write('.')
+            sys.stdout.write("\rTesting VOI safety fence now... ")
+            sys.stdout.write(str(cnt))
             sys.stdout.flush()
             goalMsg.pose.position.x = 1.8
 
+        pub_pose.publish(goalMsg)
         rate.sleep()
 
 if __name__ == '__main__':
