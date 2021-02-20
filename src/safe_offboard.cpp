@@ -265,7 +265,7 @@ void safe_offboard::check_poses(const ros::TimerEvent& event)
     {
         //Home if it is very old
         ROS_INFO_STREAM(">>>>>> Out of Waypoint Valid Time <<<<<<");
-        next_waypoint_ = home_pos_;
+        next_waypoint_.pose.position.z = 0.0;
     }
     // check the waypoint is out of range or not
     else if(!check_inside_fly_fence(next_waypoint_.pose.position.x, 
@@ -275,7 +275,7 @@ void safe_offboard::check_poses(const ros::TimerEvent& event)
                         next_waypoint_.pose.position.x << " , " <<
                         next_waypoint_.pose.position.y << " , " <<
                         next_waypoint_.pose.position.z << " <<<<<<");
-        next_waypoint_.pose.position.z = 0.0; //
+        next_waypoint_.pose.position.z = 0.0; 
     }
     waypoint_pub_.publish(next_waypoint_);
 }

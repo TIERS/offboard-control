@@ -16,28 +16,36 @@ private:
 
     ros::NodeHandle nh_;
 
-    ros::Publisher local_pos_pub;
+    ros::Publisher local_pos_pub_;
 
-    ros::Subscriber uwb_sub;
+    ros::Subscriber uwb_sub_;
 
-    ros::Subscriber lidar_sub;
+    ros::Subscriber lidar_sub_;
 
-    ros::Subscriber vision_sub; 
+    ros::Subscriber vision_sub_; 
 
-public:
-    geometry_msgs::PoseStamped uwb_pos;
+    bool vision_only_;
 
-    geometry_msgs::PoseStamped lidar_pos;
+    std::string pose_pub_topic_;
+    
+    std::string uwb_sub_topic_;
 
-    double lidar_z;
+    std::string vision_sub_topic_;
 
-    geometry_msgs::PoseStamped vision_pos;
-
-    geometry_msgs::PoseStamped local_pos;
-
+    std::string lidar_sub_topic_;
 
 public:
-    position_to_mavros(ros::NodeHandle& nh, bool vision_only=true);
+    geometry_msgs::PoseStamped uwb_pos_;
+
+    double lidar_z_;
+
+    geometry_msgs::PoseStamped vision_pos_;
+
+    geometry_msgs::PoseStamped local_pos_;
+
+
+public:
+    position_to_mavros(ros::NodeHandle& nh);
     ~position_to_mavros();
 
 

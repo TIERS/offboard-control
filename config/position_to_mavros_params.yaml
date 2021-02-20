@@ -1,4 +1,4 @@
-only_vision: True
+only_vision: true
 pose_pub_topic: "/uav/mavros/vision_pose/pose"
 uwb_sub_topic: "/dwm1001/tag/dronie/position"
 vision_sub_topic: "/uav/camera/odom/sample"
