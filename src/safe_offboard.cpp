@@ -23,6 +23,8 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     emergency_landing_ = false;
     taken_off_ = false;
 
+    offboard_state_ = "disarmed" // ["disarmed", "armed", "taking_off", "flying", "landing", "emergency", "going_home"]
+
 
     state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, &safe_offboard::state_cb, this);
     position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("/uav/mavros/vision_pose/pose", 10, &safe_offboard::update_current_pos, this);
@@ -144,44 +146,61 @@ void safe_offboard::update_current_objective(){
     {
         taken_off_ = false;
         next_waypoint_.header.stamp = ros::Time::now();
-        ROS_INFO_STREAM(">>>>>> NOT YET ARMED <<<<<<");
+        if (offboard_state_ != "disarmed" && offboard_state_ != "landing" && offboard_state_ != "emergency")
+        {
+            offboard_state_ = "disarmed";
+            ROS_INFO_STREAM(">>>>>> MAV IS NOT YET ARMED <<<<<<");
+        }
         // do nothing (already set to home pos)
     }
     else if (current_state_.armed && !taken_off_ &&
             current_pos_.pose.position.z < takeoff_height_ - 0.2)
     {
+        if (offboard_state_ != "taking_off" && offboard_state_ != "landing" && offboard_state_ != "emergency")
+        {
+            offboard_state_ = "taking_off";
+            ROS_INFO_STREAM(">>>>>> MAV IS TAKING OFF <<<<<<");
+        }
 
-        ROS_INFO_STREAM(">>>>>> TAKING OFF <<<<<<");
-
-        next_waypoint_.pose.position.z = takeoff_height_;
-        next_waypoint_.header.stamp = ros::Time::now();
+        if (offboard_state_ == "taking_off")
+        {
         
-        if (current_pos_.pose.position.z > takeoff_height_ - 0.2) {
-            taken_off_ = true;
-            ROS_INFO_STREAM(">>>>>> UP IN THE SKY <<<<<<");
+            next_waypoint_.pose.position.z = takeoff_height_;
+            next_waypoint_.header.stamp = ros::Time::now();
+            
+            if (current_pos_.pose.position.z > takeoff_height_ - 0.2) {
+                taken_off_ = true;
+                offboard_state_ = "flying";
+                ROS_INFO_STREAM(">>>>>> MAV IS UP IN THE SKY -- READY TO FLY <<<<<<");
+            }
         }
         
     }
     else 
     {
-        ROS_INFO_STREAM(">>>>>> FLYING <<<<<<");
-        if (flight_mode_ == "land")
+        if (offboard_state_ == "going_home")
+        {
+            next_waypoint_ = home_pos_;
+            next_waypoint_.pose.position.z = 0;
+            next_waypoint_.header.stamp = ros::Time::now();
+        }
+        if (flight_mode_ == "land" || offboard_state_ == "landing")
         {
             next_waypoint_ = current_pos_;
             next_waypoint_.pose.position.z = 0;
             next_waypoint_.header.stamp = ros::Time::now();
         }
-        if (flight_mode_ == "stay")
+        if (flight_mode_ == "stay" && offboard_state_ == "flying")
         {
             next_waypoint_.pose.position.z = takeoff_height_;
             next_waypoint_.header.stamp = ros::Time::now();
         }
-        else if (flight_mode_ == "hover")
+        else if (flight_mode_ == "hover" && offboard_state_ == "flying")
         {
             next_waypoint_ = current_pos_;
             next_waypoint_.header.stamp = ros::Time::now();
         }
-        else if (flight_mode_ == "circle")
+        else if (flight_mode_ == "circle" && offboard_state_ == "flying")
         {
             double theta = atan2(current_pos_.pose.position.y, current_pos_.pose.position.x);
             double new_theta = fmod(theta + 0.5, 2*M_PI);
@@ -195,7 +214,7 @@ void safe_offboard::update_current_objective(){
             next_waypoint_.pose.orientation.w = 1;
             next_waypoint_.header.stamp = ros::Time::now();      
         }
-        else if (flight_mode_ == "external_control")
+        else if (flight_mode_ == "external_control" && offboard_state_ == "flying")
         {
             next_waypoint_ = next_external_waypoint_;
         }
@@ -265,6 +284,7 @@ void safe_offboard::check_poses(const ros::TimerEvent& event)
         //Land if timestamp is very old
         ROS_INFO_STREAM(">>>>>> Out of Position Valid Time <<<<<<");
         next_waypoint_.pose.position.z = 0.0;
+        offboard_state_ = "landing";
     }
     //check the waypoint is old or not
     else if((ros::Time::now() - next_waypoint_.header.stamp) > ros::Duration(waypoint_valid_time_)) 
@@ -272,6 +292,7 @@ void safe_offboard::check_poses(const ros::TimerEvent& event)
         //Home if it is very old
         ROS_INFO_STREAM(">>>>>> Out of Waypoint Valid Time <<<<<<");
         next_waypoint_.pose.position.z = 0.0;
+        offboard_state_ = "landing";
     }
     // check the waypoint is out of range or not
     else if(!check_inside_fly_fence(next_waypoint_.pose.position.x, 
@@ -282,6 +303,7 @@ void safe_offboard::check_poses(const ros::TimerEvent& event)
                         next_waypoint_.pose.position.y << " , " <<
                         next_waypoint_.pose.position.z << " <<<<<<");
         next_waypoint_.pose.position.z = 0.0; 
+        offboard_state_ = "landing";
     }
     waypoint_pub_.publish(next_waypoint_);
 }

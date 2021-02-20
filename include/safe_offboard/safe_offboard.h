@@ -78,6 +78,8 @@ private:
 
     bool taken_off_;
 
+    std::string offboard_state_;
+
 public:
     safe_offboard(ros::NodeHandle& nh);
     ~safe_offboard();
