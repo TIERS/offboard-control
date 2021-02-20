@@ -42,8 +42,12 @@ safe_offboard::~safe_offboard()
 
 void safe_offboard::state_cb(const mavros_msgs::State::ConstPtr& msg){
     current_state_ = *msg;
+    if ( !current_state_.armed ) {
+        offboard_state_ = "disarmed";
+    }
     if ( current_state_.armed && offboard_state_ == "disarmed") {
         offboard_state_ = "armed";
+        // std::cout << " --------> AAAAARMEEEED " << std::endl;
     }
 }
 
@@ -145,6 +149,9 @@ void safe_offboard::update_external_waypoint(const geometry_msgs::PoseStamped::C
 void safe_offboard::update_current_objective(){
     next_waypoint_ = home_pos_;
 
+    // std::cout << "Offboard state: " << offboard_state_ << std::endl;
+    // std::cout << "Flight mode: " << flight_mode_ << std::endl;
+
     if (!current_state_.armed) 
     {
         taken_off_ = false;
@@ -156,8 +163,7 @@ void safe_offboard::update_current_objective(){
         }
         // do nothing (already set to home pos)
     }
-    else if (current_state_.armed && !taken_off_ &&
-            current_pos_.pose.position.z < takeoff_height_ - 0.2)
+    else if (current_state_.armed && !taken_off_)
     {
         if (offboard_state_ != "taking_off" && offboard_state_ != "landing" && offboard_state_ != "emergency")
         {
@@ -181,19 +187,19 @@ void safe_offboard::update_current_objective(){
     }
     else 
     {
-        if (offboard_state_ == "going_home")
-        {
-            next_waypoint_ = home_pos_;
-            next_waypoint_.pose.position.z = 0;
-            next_waypoint_.header.stamp = ros::Time::now();
-        }
         if (flight_mode_ == "land" || offboard_state_ == "landing")
         {
             next_waypoint_ = current_pos_;
             next_waypoint_.pose.position.z = 0;
             next_waypoint_.header.stamp = ros::Time::now();
         }
-        if (flight_mode_ == "stay" && offboard_state_ == "flying")
+        else if (offboard_state_ == "going_home")
+        {
+            next_waypoint_ = home_pos_;
+            next_waypoint_.pose.position.z = 0;
+            next_waypoint_.header.stamp = ros::Time::now();
+        }
+        else if (flight_mode_ == "stay" && offboard_state_ == "flying")
         {
             next_waypoint_.pose.position.z = takeoff_height_;
             next_waypoint_.header.stamp = ros::Time::now();
@@ -222,7 +228,9 @@ void safe_offboard::update_current_objective(){
             next_waypoint_ = next_external_waypoint_;
         }
     }
-    
+
+    // std::cout << " --> " << offboard_state_ << std::endl;
+    // std::cout << " Next waypoint: " << next_waypoint_.pose.position.x << ", " << next_waypoint_.pose.position.y << ", " << next_waypoint_.pose.position.z << ", " << std::endl;
 }
 
 void safe_offboard::update_current_objective(geometry_msgs::PoseStamped& objective){

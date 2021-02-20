@@ -17,10 +17,10 @@ def offboard_test():
     mode = String()
     mode.data = "external_control"
     print("Publishing...")
-    for i in range(2) :
-        print(i)
-        time.sleep(0.5)
-        pub_mode.publish(mode)
+    # for i in range(2) :
+    #     print(i)
+    #     time.sleep(0.05)
+    #     pub_mode.publish(mode)
     
     rate = rospy.Rate(10) # 10hz
     cnt = 0
@@ -44,6 +44,8 @@ def offboard_test():
             goalMsg.pose.position.x = 1.8
 
         pub_pose.publish(goalMsg)
+        if cnt < 10 :
+            pub_mode.publish(mode)
         rate.sleep()
 
 if __name__ == '__main__':
