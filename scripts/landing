@@ -32,4 +32,35 @@ class LandingControl() :
         '''
 
         # Init node
-        rospy.init_node('Offboard_Control_Node', anonymous=False)
+        rospy.init_node('UWB_VIO_Landing', anonymous=False)
+
+        #
+        self.pos = PoseStamped()
+        self.next_pos = PoseStamped()
+
+        # Get pos from PX4 EKF2 that already integrates VIO and/or others
+		self.local_pos_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.update_current_pos_cb)
+
+        # Wait to get local pos lock
+        sys.stdout.write('Waiting for (mavros) local pos lock...")
+        while not self.pos.header.stamp :
+            sys.stdout.write('..')
+            sys.stdout.flush()
+        self.home_pos = self.pos
+		print("Home position: {}".format(self.pos))
+
+        # Publisher for actual control
+
+        
+
+    def update_current_pos_cb(self, pos) :
+		'''
+			Update position from mavros local pose.
+		'''
+		self.pos = pos
+
+    def update_objective(self) :
+        '''
+            Update objective waypoint in order to land
+        '''
+        pass
