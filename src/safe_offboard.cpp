@@ -23,7 +23,7 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     emergency_landing_ = false;
     taken_off_ = false;
 
-    offboard_state_ = "disarmed" // ["disarmed", "armed", "taking_off", "flying", "landing", "emergency", "going_home"]
+    offboard_state_ = "disarmed"; // ["disarmed", "armed", "taking_off", "flying", "landing", "emergency", "going_home"]
 
 
     state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, &safe_offboard::state_cb, this);
