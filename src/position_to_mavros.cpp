@@ -9,7 +9,7 @@ position_to_mavros::position_to_mavros(ros::NodeHandle& nh){
     nhh.param<bool>("only_vision", vision_only_, true);
     nhh.param<std::string>("pose_pub_topic", pose_pub_topic_, "/uav/mavros/vision_pose/pose");
     nhh.param<std::string>("uwb_sub_topic", uwb_sub_topic_, "/dwm1001/tag/dronie/position");
-    nhh.param<std::string>("vision_sub_topic", vision_sub_topic_, "/uav/camera/odom/sample");
+    nhh.param<std::string>("vision_sub_topic", vision_sub_topic_, "/uav/t265/odom/sample");
     nhh.param<std::string>("lidar_sub_topic", lidar_sub_topic_, "/uav/tfmini_ros_node/range");
 
     local_pos_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(pose_pub_topic_, 5);

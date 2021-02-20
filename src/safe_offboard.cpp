@@ -144,21 +144,27 @@ void safe_offboard::update_current_objective(){
     {
         taken_off_ = false;
         next_waypoint_.header.stamp = ros::Time::now();
+        ROS_INFO_STREAM(">>>>>> NOT YET ARMED <<<<<<");
         // do nothing (already set to home pos)
     }
     else if (current_state_.armed && !taken_off_ &&
             current_pos_.pose.position.z < takeoff_height_ - 0.2)
     {
-        next_waypoint_.pose.orientation.z = takeoff_height_;
+
+        ROS_INFO_STREAM(">>>>>> TAKING OFF <<<<<<");
+
+        next_waypoint_.pose.position.z = takeoff_height_;
         next_waypoint_.header.stamp = ros::Time::now();
         
         if (current_pos_.pose.position.z > takeoff_height_ - 0.2) {
             taken_off_ = true;
+            ROS_INFO_STREAM(">>>>>> UP IN THE SKY <<<<<<");
         }
         
     }
     else 
     {
+        ROS_INFO_STREAM(">>>>>> FLYING <<<<<<");
         if (flight_mode_ == "land")
         {
             next_waypoint_ = current_pos_;
