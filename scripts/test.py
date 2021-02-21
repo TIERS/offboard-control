@@ -11,8 +11,8 @@ def offboard_test():
     print("Starting...")
     rospy.init_node('test_offboard', anonymous=False)
 
-    pub_mode = rospy.Publisher('/offboard/mode', String, queue_size=10)
-    pub_pose = rospy.Publisher('/uav/external_waypoints', PoseStamped, queue_size=10)
+    pub_mode = rospy.Publisher('/uav/offboard/mode', String, queue_size=10)
+    pub_pose = rospy.Publisher('/uav/offboard/command_waypoint', PoseStamped, queue_size=10)
 
     mode = String()
     mode.data = "external_control"

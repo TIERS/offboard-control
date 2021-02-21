@@ -104,11 +104,11 @@ bool safe_offboard::flight_mode_srv_cb(offboard_control::flight_mode::Request &r
     }
     else if (request.mode == "external_control")
     {   
-        if(offboard_state_ == "flying"))
+        if(offboard_state_ == "flying")
             flight_mode_ = "external_control";
         else
         {
-            response.feedback = "UAV Is Not in "flying" state, Flight Mode Set Failed.";
+            response.feedback = "UAV Is Not in 'flying' state, Flight Mode Set Failed.";
             return false;
         }
     }
