@@ -8,7 +8,9 @@
         <rosparam file="$(find offboard_control)/config/safe_offboard_params.yaml" command="load"/>
     </node>
 
-    <include file="$(find mavros)/launch/px4.launch" />
+    <include file="$(find mavros)/launch/px4.launch">
+        <arg name="fcu_url" default="/dev/pixhawk:57600" />
+    </include>
 
     <include file="$(find realsense2_camera)/launch/rs_camera.launch">
         <arg name="camera"     value="t265" />
