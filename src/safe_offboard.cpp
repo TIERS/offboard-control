@@ -27,13 +27,13 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
 
 
     state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, &safe_offboard::state_cb, this);
-    position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("/uav/mavros/vision_pose/pose", 10, &safe_offboard::update_current_pos, this);
-    external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("/uav/external_waypoints", 10, &safe_offboard::update_external_waypoint, this);
+    position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("mavros/vision_pose/pose", 10, &safe_offboard::update_current_pos, this);
+    external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("offboard/command_waypoint", 10, &safe_offboard::update_external_waypoint, this);
     waypoint_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
     arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
     set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
-    emergency_land_server_ = nh_.advertiseService("/uav/emergency_land", &safe_offboard::emergency_srv_cb, this);
-    flight_mode_sub_ = nh_.subscribe<std_msgs::String>("/offboard/mode", 10, &safe_offboard::mode_cb, this);
+    emergency_land_server_ = nh_.advertiseService("offboard/emergency_land", &safe_offboard::emergency_srv_cb, this);
+    flight_mode_sub_ = nh_.subscribe<std_msgs::String>("offboard/mode", 10, &safe_offboard::mode_cb, this);
 }
 
 safe_offboard::~safe_offboard()
