@@ -40,6 +40,8 @@ private:
 
     ros::Publisher waypoint_pub_;
 
+    ros::Publisher flight_mode_pub_;
+
     ros::Publisher offboard_state_pub_;
 
     ros::ServiceClient arming_client_;

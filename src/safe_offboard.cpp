@@ -31,7 +31,8 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("offboard/command_waypoint", 10, &safe_offboard::update_external_waypoint, this);
 
     waypoint_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
-    offboard_state_pub_ = nh_.advertise<std_msgs::String>("safe_offboard_mode", 10);
+    offboard_state_pub_ = nh_.advertise<std_msgs::String>("safe_offboard_state", 10);
+    flight_mode_pub_ = nh_.advertise<std_msgs::String>("flight_mode", 10);
     arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
     set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
     emergency_land_server_ = nh_.advertiseService("offboard/emergency_land", &safe_offboard::emergency_srv_cb, this);
@@ -117,7 +118,7 @@ bool safe_offboard::flight_mode_srv_cb(offboard_control::flight_mode::Request &r
         return false;
     }
     
-    response.feedback = "Flight Mode Set Succeeded.";;
+    response.feedback = "Flight Mode Set Succeeded.";
     return true;
 }
 
@@ -410,6 +411,9 @@ void safe_offboard::pub_offboard_state(const ros::TimerEvent& event)
     std_msgs::String msg;
     msg.data = offboard_state_;
     offboard_state_pub_.publish(msg);
+    std_msgs::String m;
+    m.data = flight_mode_;
+    flight_mode_pub_.publish(m);
 }
 
 void safe_offboard::run()
