@@ -7,7 +7,7 @@ offboard_mode_topic:  "offboard/mode"
 
 dist_to_target_topic: "landing/distance"
 
-max_pos_delay:        0.4
+max_pos_delay:        0.6
 
 waypoint_step:        0.2
 
