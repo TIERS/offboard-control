@@ -3,7 +3,7 @@
   <include file="$(find tfmini_ros_tiers)/launch/tfmini.launch" />
 
   <node pkg="dwm1001_uwb_tag_drivers" type="dwm1001_active" name="dwm1001_active" output="screen">
-    <param name="port" type="string" value="/dev/ttyACM1" />
+    <param name="port" type="string" value="/dev/uwb" />
     <param name="tag_name" type="string" value="dronie" />
   </node>
 

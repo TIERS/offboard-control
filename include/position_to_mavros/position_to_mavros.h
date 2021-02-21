@@ -10,6 +10,9 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
 
+#include <mavros_msgs/CommandTOL.h>
+#include <mavros_msgs/SetMode.h>
+
 class position_to_mavros
 {
 private:
@@ -23,6 +26,8 @@ private:
     ros::Subscriber lidar_sub_;
 
     ros::Subscriber vision_sub_; 
+
+    ros::ServiceClient landing_client_;
 
     bool vision_only_;
 
