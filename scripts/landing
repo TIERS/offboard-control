@@ -4,63 +4,254 @@ import os
 import sys
 import paho
 import rospy
-import mavros
+import numpy
 
-from time 				import sleep
-from numpy.linalg		import norm
-from math				import pi
-from math				import sin
-from math				import cos
-from math				import sqrt
-from math				import atan2
-
-from numpy 				import array 		as numpy_array
-
-from geometry_msgs.msg 	import PoseStamped
-
-from mavros_msgs.msg 	import State
-from mavros_msgs.srv 	import SetMode
-from mavros_msgs.srv 	import CommandTOL
-from mavros_msgs.srv 	import CommandBool
-
+from std_msgs.msg       import String
+from nav_msgs.msg       import Odometry
+from sensor_msgs.msg    import Range
+from geometry_msgs.msg  import PoseStamped
 
 class LandingControl() :
 
     def __init__(self) :
         '''
-
+            Test node to land a UAV on a UGV based on UWB ranging.
+            Landing options:
+                - Use external UWB anchors to position both vehicles
+                - Use single UAV-UGV range measurement + VIO on both vehicles
+                - Use multiple UWB transceivers on UGV to estimate relative positions
+                - Use multiple UWB transceivers on both UGV and UAV to estimate relative poses
         '''
 
         # Init node
         rospy.init_node('UWB_VIO_Landing', anonymous=False)
 
-        #
+        # Positions for navigation
         self.pos = PoseStamped()
-        self.next_pos = PoseStamped()
+        self.uav_uwb_pos = PoseStamped()
+        self.ugv_uwb_pos = PoseStamped()
+        self.objective = PoseStamped()
+
+        self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
+        self.waypoint_step = rospy.get_param("~waypoint_step", 0.2)
+
+        # Control altitudes
+        self.approaching_altitude = rospy.get_param("~approaching_altitude", 1.2)
+        self.closing_altitude = rospy.get_param("~closing_altitude", 0.8)
+        self.landing_altitude = rospy.get_param("~landing_altitude", 0.48)
+
+        self.closing_dist = rospy.get_param("~closing_dist", 1)
+        self.landing_dist = rospy.get_param("~landing_dist", 0.1)
+
+        # Publish distance to target in a topic
+        self.dist_to_target_topic = rospy.get_param("~dist_to_target_topic", "landing/distance")
+        self.dist_to_target = -1
+        self.dist_to_target_pub = rospy.Publisher(self.dist_to_target, Range, queue_size=10)
 
         # Get pos from PX4 EKF2 that already integrates VIO and/or others
-		self.local_pos_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.update_current_pos_cb)
+        self.local_pos_topic =  rospy.get_param("~local_pos_topic", "/uav/mavros/local_position/pose")
+        rospy.loginfo("Subscribing to local (mavros) position at {}".format(self.local_pos_topic))
+
+        self.local_pos_sub = rospy.Subscriber(self.local_pos_topic, PoseStamped, self.update_current_pos_cb)
 
         # Wait to get local pos lock
-        sys.stdout.write('Waiting for (mavros) local pos lock...")
+        sys.stdout.write("Waiting for (mavros) local pos lock...")
         while not self.pos.header.stamp :
-            sys.stdout.write('..')
+            sys.stdout.write("..")
             sys.stdout.flush()
         self.home_pos = self.pos
-		print("Home position: {}".format(self.pos))
+        rospy.loginfo("Home position locked: {}".format(self.pos))
+
+        # UWB Subscribers
+        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
+        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dronie/position")
+        rospy.loginfo("Subscribing to UAV UWB at {}".format(self.uav_uwb_topic))
+        rospy.loginfo("Subscribing to UGV UWB at {}".format(self.ugv_uwb_topic))
+
+        self.uav_uwb_subscriber = rospy.Subscriber(self.uav_uwb_topic, PoseStamped, self.uav_uwb_cb)
+        self.ugv_uwb_subscriber = rospy.Subscriber(self.ugv_uwb_topic, PoseStamped, self.ugv_uwb_cb)
+
+        # UGV VIO pose (lower freq)
+        self.ugv_vio_pos = Odometry()
+        self.ugv_vio_topic = rospy.get_param("~ugv_vio_topic", "/ugv/t265/odom/sample")
+        rospy.loginfo("Subscribing to UGV VIO odometry at {}".format(self.ugv_vio_topic))
+
+        self.ugv_vio_subscriber = rospy.Subscriber(self.ugv_vio_topic, Odometry, self.ugv_vio_cb)
 
         # Publisher for actual control
-
+        self.waypoint_pub_topic = rospy.get_param('~waypoint_pub_topic', "/dwm1001/tag/dronie/position")
+        self.control_pub = rospy.Publisher(self.waypoint_pub_topic, PoseStamped, queue_size=10)
         
+        # Keep track of offboard state
+        self.offboard_state = String()
+        self.offboard_state_topic = rospy.get_param("offboard_state_topic", "offboard/state")
+        rospy.loginfo("Subscribing to offboard state at {}".format(self.offboard_state_topic))
+
+        self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
+
+        # Service for changing to external offboard mode
+        self.set_ofboard_mode_client  = rospy.ServiceProxy("offboard/cmd/mode", String)
 
     def update_current_pos_cb(self, pos) :
-		'''
-			Update position from mavros local pose.
-		'''
-		self.pos = pos
+        '''
+            Update position from mavros local pose (callback)
+        '''
+        self.pos = pos
+
+    def uav_uwb_cb(self, pos) :
+        '''
+            Update UAV UWB position (callback)
+        '''
+        self.uav_uwb_pos = pos
+        
+    def ugv_uwb_cb(self, pos) :
+        '''
+            Update UGV UWB position (callback)
+        '''
+        self.ugv_uwb_pos = pos
+
+    def update_offboard_state_cb(self, state) :
+        '''
+            Update offboard state (callback)
+        '''
+        self.offboard_state = state.data
+
+    def ugv_vio_cb(self, odom) :
+        '''
+            Updata UGV VIO odom (callback)
+        '''
+        self.ugv_vio_pos = odom
+
+    def publish_dist_to_target(self) :
+        '''
+            Publish distance to target (timer callback)
+        '''
+        r = Range()
+        r.header.stamp = rospy.Time.now()
+        r.range = self.dist_to_target
+        self.dist_to_target_pub.publish(r)
 
     def update_objective(self) :
         '''
-            Update objective waypoint in order to land
+            Update objective waypoint in order to move towards target and land (timer callback)
         '''
-        pass
+        self.objective = PoseStamped()
+
+        if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > self.max_pos_delay :
+            self.publishing_objective = False
+            if self.publishing_objective :
+                rospy.logwarn("Not receiving UGV UWB pose updates...")
+        elif rospy.Time.now() - self.uav_uwb_pos.header.stamp > self.max_pos_delay :
+            self.publishing_objective = False
+            if self.publishing_objective :
+                rospy.logwarn("Not receiving UAV UWB pose updates...")
+        elif rospy.Time.now() - self.pos.header.stamp > self.max_pos_delay :
+            self.publishing_objective = False
+            if self.publishing_objective :
+                rospy.logwarn("Not receiving MAVROS local POS update...")
+        else :
+            self.publishing_objective = True
+            ugv_pos = numpy.array(
+                self.ugv_uwb_pos.pose.position.x,
+                self.ugv_uwb_pos.pose.position.y
+            )
+            uav_pos = numpy.array(
+                self.uav_uwb_pos.pose.position.x,
+                self.uav_uwb_pos.pose.position.y
+            )
+            move_dir = ugv_pos - uav_pos
+            self.dist_to_target = numpy.linalg.norm(move_dir)
+            move_dir = self.waypoint_step * move_dir / self.dist_to_target
+            
+            self.objective = self.pos
+            self.objective.header.stamp = rospy.Time.now()
+            self.objective.pose.position.x += move_dir[0]
+            self.objective.pose.position.y += move_dir[1]
+
+            if self.dist_to_target > self.closing_dist :
+                self.objective.pose.position.z = self.approaching_altitude
+            elif self.dist_to_target > self.landing_dist :
+                self.objective.pose.position.z = self.closing_altitude
+            elif self.dist_to_target <= self.landing_dist and self.dist_to_target > 0 :
+                self.objective.pose.position.z = self.landing_altitude
+            else :
+                rospy.logerr("Distance to target of {} does not make sense...".format(self.dist_to_target))
+
+            # Clone orientation to UGV's
+            self.objective.pose.orientation.x = self.ugv_vio_pos.pose.pose.orientation.x
+            self.objective.pose.orientation.y = self.ugv_vio_pos.pose.pose.orientation.y
+            self.objective.pose.orientation.z = self.ugv_vio_pos.pose.pose.orientation.z
+            self.objective.pose.orientation.w = self.ugv_vio_pos.pose.pose.orientation.w
+
+            self.control_pub.publish(self.objective)
+
+    def run(self) :
+        '''
+            Infinite loop that flies the drone
+        '''
+
+        # Set a rospy state check rate and landing check rate
+        flag_check_rate = rospy.Rate(2.0)
+        land_check_rate = rospy.Rate(10.0)
+
+        # Set objective update timer
+        self.objective_timer = rospy.Timer(rospy.Duration(0.1), self.update_objective)
+
+        # Set distance to target publish timer
+        self.dist_to_target_timer = rospy.Timer(rospy.Duration(0.1), self.publish_dist_to_target)
+
+        # Wait until objective is being published
+        while not self.publishing_objective :
+            rospy.loginfo("Waiting for all control data to be available...")
+            flag_check_rate.sleep()
+
+        # Set offboard mode to external
+        rospy.loginfo("Setting offboard mode to external...")
+        rospy.wait_for_service('offboard/cmd/mode')
+        try:
+            self.set_ofboard_mode_client(request=String("external_control"))
+        except rospy.ServiceException as e:
+            print("Service failed: {}. Offboard mode cannot be changed to external control.".format(e))
+
+        # Start flying towards target and check when we should land
+        rospy.loginfo("Everything in order. Let's fly.")
+        try:
+            while not rospy.is_shutdown() :
+
+                if self.offboard_state != "external" :
+                    pass # TODO print warning and try to change or do something
+
+                else:
+                    pass # TODO everything normal, wait to be on position to land
+
+                # Update objective position and publish it               
+                land_check_rate.sleep()
+
+        except KeyboardInterrupt :
+            rospy.logerr('Keyboard Interrupt detected! Trying to land')
+
+        # Stop objective update timer and land
+        self.objective_timer.shutdown()
+        self.dist_to_target_timer.shutdown()
+        rospy.loginfo("Mission Completed. Landing...")
+        rospy.wait_for_service('/mavros/cmd/land')
+
+
+if __name__ == '__main__':
+    '''
+        Run the node
+    '''
+    try:
+
+        # Create new control object
+        control = LandingControl()
+
+        # Run the mission control
+        control.run()
+
+    except rospy.ROSInterruptException:
+
+        control.objective_timer.shutdown()
+        control.dist_to_target_timer.shutdown()
+        rospy.loginfo("Mission abruptly stopped. Trying to land...")
+        rospy.wait_for_service('/mavros/cmd/land')

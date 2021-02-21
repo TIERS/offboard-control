@@ -1,0 +1,19 @@
+uav_uwb_topic:        "/dwm1001/tag/dronie/position"
+ugv_uwb_topic:        "/dwm1001/tag/ugv/position"
+
+local_pos_topic:      "mavros/local_position/pose"
+waypoint_pub_topic:   "offboard/command_waypoint"
+offboard_mode_topic:  "offboard/mode"
+
+dist_to_target_topic: "landing/distance"
+
+max_pos_delay:        0.4
+
+waypoint_step:        0.2
+
+approaching_altitude: 1.2
+closing_altitude:     0.8
+landing_altitude:     0.45
+
+closing_dist:         1.5
+landing_dist:         0.1
