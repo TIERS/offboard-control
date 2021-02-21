@@ -51,7 +51,7 @@ public:
 
 private:
 
-    void uwb_callback(const geometry_msgs::Pose::ConstPtr& msg);
+    void uwb_callback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
     void lidar_callback(const sensor_msgs::Range::ConstPtr& msg);
 

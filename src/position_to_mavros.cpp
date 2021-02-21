@@ -14,7 +14,7 @@ position_to_mavros::position_to_mavros(ros::NodeHandle& nh){
 
     local_pos_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(pose_pub_topic_, 5);
     if(!vision_only_){
-        uwb_sub_ = nh_.subscribe<geometry_msgs::Pose>(uwb_sub_topic_, 1, &position_to_mavros::uwb_callback, this);
+        uwb_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>(uwb_sub_topic_, 1, &position_to_mavros::uwb_callback, this);
 
         lidar_sub_ = nh_.subscribe<sensor_msgs::Range>(lidar_sub_topic_, 1, &position_to_mavros::lidar_callback, this);
     }
@@ -27,12 +27,12 @@ position_to_mavros::position_to_mavros(ros::NodeHandle& nh){
 position_to_mavros::~position_to_mavros(){}
 
 
-void position_to_mavros::uwb_callback(const geometry_msgs::Pose::ConstPtr& msg)
+void position_to_mavros::uwb_callback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
     // ROS_INFO_STREAM(">>>>>> In UWB Callback <<<<<<");
     uwb_pos_.header.stamp = ros::Time::now();
-    uwb_pos_.pose.position.x = msg->position.x;
-    uwb_pos_.pose.position.y = msg->position.y;
+    uwb_pos_.pose.position.x = msg->pose.position.x;
+    uwb_pos_.pose.position.y = msg->pose.position.y;
     uwb_pos_.pose.position.z = lidar_z_;
 
     local_pos_pub_.publish(uwb_pos_);
@@ -76,7 +76,7 @@ void position_to_mavros::run(const ros::TimerEvent& event){
 
     // T.transform.setRotation( tf2::Quaternion(0, 0, 0, 1) );
     //  tf2::Quaternion q;
-    // // q.setRPY(0, 0, 0);
+    // q.setRPY(0, 0, 0);
     T.transform.rotation.x = 0.0;//-vision_pos_.pose.orientation.x;//0.0;
     T.transform.rotation.y = 0.0;//-vision_pos_.pose.orientation.y;//0.0;
     T.transform.rotation.z = 0.0;//-vision_pos_.pose.orientation.z;//0.0;
