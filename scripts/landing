@@ -7,8 +7,8 @@ import time
 import rospy
 import numpy
 
-from std_msgs.msg       import Float64
 from std_msgs.msg       import String
+from std_msgs.msg       import Float64
 from nav_msgs.msg       import Odometry
 from sensor_msgs.msg    import Range
 from geometry_msgs.msg  import PoseStamped
@@ -103,7 +103,7 @@ class LandingControl() :
         self.lidar_topic = rospy.get_param('~lidar_topic', "/uav/tfmini_ros_node/range")
         self.lidar_subscriber = rospy.Subscriber(self.lidar_topic, Range, self.lidar_cb)
 
-        self.lidarz = 0
+        self.lidarz = 0.3
 
         # Ranging subscribers
         self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/tag_A/distance", Float64, self.custom_uwbA_cb)
@@ -111,12 +111,25 @@ class LandingControl() :
         self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/tag_C/distance", Float64, self.custom_uwbC_cb)
         self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/tag_D/distance", Float64, self.custom_uwbD_cb)
 
-        self.custom_uwb_ranges = numpy.zeros(4) - 1
+        self.custom_uwb_ranges = numpy.ones(4)
+        self.custom_uwb_stamps = [rospy.Time()] * 4
         self.num_uwb_in_use = 4
-        self.using_custom_uwb = True
+        self.using_custom_uwb = True    # Do not use Decawave's DRTLS
+        self.min_uwb_ranges = False     # At least 2 transceivers should be active...
 
         self.ugv_x0 = 0.6
         self.ugv_y0 = 0.6
+        
+        # UWB pairs to calculate relative pos and average
+        # 3rd element means x is calculated with cos (+1) or sin (-1)
+        # 4th, 5th elements have to be added to x,y respectively
+        # 6th element is the third side of the traingle to estimate angle
+        self.uwb_pairs = [
+            [0, 3, 1, 0, 0, self.ugv_x0],
+            [1, 2, 1, 0, self.ugv_y0, self.ugv_x0],
+            [0, 1, -1, 0, 0, self.ugv_y0],
+            [3, 2, -1, self.ugv_x0, 0, self.ugv_y0]
+        ]
 
 
     def update_current_pos_cb(self, pos) :
@@ -156,6 +169,7 @@ class LandingControl() :
         self.custom_uwb_ranges[0] = range.data - 0.3
         if self.custom_uwb_ranges[0] < 0 :
             self.custom_uwb_ranges[0] = 0
+        self.custom_uwb_stamps[0] = rospy.Time.now()
 
     def custom_uwbB_cb(self, range) :
         '''
@@ -164,6 +178,7 @@ class LandingControl() :
         self.custom_uwb_ranges[1] = range.data - 0.3
         if self.custom_uwb_ranges[1] < 0 :
             self.custom_uwb_ranges[1] = 0
+        self.custom_uwb_stamps[1] = rospy.Time.now()
 
     def custom_uwbC_cb(self, range) :
         '''
@@ -172,6 +187,7 @@ class LandingControl() :
         self.custom_uwb_ranges[2] = range.data - 0.3
         if self.custom_uwb_ranges[2] < 0 :
             self.custom_uwb_ranges[2] = 0
+        self.custom_uwb_stamps[2] = rospy.Time.now()
 
     def custom_uwbD_cb(self, range) :
         '''
@@ -180,6 +196,7 @@ class LandingControl() :
         self.custom_uwb_ranges[3] = range.data - 0.3
         if self.custom_uwb_ranges[3] < 0 :
             self.custom_uwb_ranges[3] = 0
+        self.custom_uwb_stamps[3] = rospy.Time.now()
 
     def lidar_cb(self, range) :
         '''
@@ -187,53 +204,70 @@ class LandingControl() :
         '''
         self.lidarz = pos.range
 
+    def check_min_uwb_ranges(self) :
+        '''
+            Checks at least two (usable) ranges are available
+        '''
+        cnt = 0
+        diffs = [rospy.Time.now() - stamp - rospy.Duration(self.max_pos_delay) for stamp in self.custom_uwb_stamps]
+        for pair in self.uwb_pairs :
+            if diffs[pair[0]] < rospy.Duration(0) and diffs[pair[1]] < rospy.Duration(0) :
+                cnt += 1
+        if cnt > 1 :
+            self.min_uwb_ranges = True
+        else :
+            self.min_uwb_ranges = False
+
+
     def calculate_relative_uwb_poses(self) :
         '''
-            TODO
+            Calculates relative UGV-UAV position based on 2-4 transceivers on the UGV
         '''
         ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin(self.lidarz / self.custom_uwb_ranges) )
-        print(ground_distances)
 
-        est_cnt = 0 # Count how many pairs of transceivers we use
+        est_cnt = 0 # Count how many pairs of transceivers we use to average estimation
         est_x = 0
         est_y = 0
 
-        # Estimate using one pair of UGV transceivers
-        est_arg = ( ground_distances[0]**2 + self.ugv_x0**2 - ground_distances[3] **2 ) / (2 * ground_distances[0] * self.ugv_x0 )
-        if est_arg > -1 and est_arg < 1 :
-            est_theta = math.acos( est_arg )
-            est_x += ground_distances[0] * math.cos(est_theta)
-            est_y += ground_distances[0] * math.sin(est_theta)
-            est_cnt += 1
+        # UWB pairs to calculate relative pos and average
+        # 3rd element means x is calculated with cos (+1) or sin (-1)
+        # 4th, 5th elements have to be added to x,y respectively (offsets)
+        # 6th element is the third side of the traingle to estimate angle
+        diffs = [rospy.Time.now() - stamp - rospy.Duration(self.max_pos_delay) for stamp in self.custom_uwb_stamps]
+        for pair in self.uwb_pairs :
+            if diffs[pair[0]] < rospy.Duration(0) and diffs[pair[1]] < rospy.Duration(0) :
+                est_arg = ( ground_distances[pair[0]]**2 + pair[5]**2 - ground_distances[pair[1]] **2 ) / (2 * ground_distances[pair[0]] * pair[5] )
+                if est_arg > -1 and est_arg < 1 :
+                    est_theta = math.acos( est_arg )
+                    print("Pair {} -- {}  =========> Theta = {}".format(pair[0], pair[1], est_theta))
+                    if pair[2] > 0 :
+                        est_x += ground_distances[pair[0]] * math.cos(est_theta) + pair[3]
+                        est_y += ground_distances[pair[0]] * math.sin(est_theta) + pair[4]
+                    else :
+                        est_x += ground_distances[pair[0]] * math.sin(est_theta) + pair[3]
+                        est_y += ground_distances[pair[0]] * math.cos(est_theta) + pair[4]
+                    est_cnt += 1
+        
+        if est_cnt > 0 :
+            est_relative_pos = numpy.array([est_x, est_y]) / est_cnt
+            print("Relative position estimate: ({})".format(est_relative_pos))
 
-        # Estimate using the second pair of UGV transceivers
-        est_arg = ( ground_distances[1]**2 + self.ugv_x0**2 - ground_distances[2] **2 ) / (2 * ground_distances[1] * self.ugv_x0 )
-        if est_arg > -1 and est_arg < 1 :
-            est_theta = math.acos( est_arg )
-            est_x += ground_distances[1] * math.cos(est_theta)
-            est_y += ground_distances[1] * math.sin(est_theta) + self.ugv_y0
-            est_cnt += 1
+            # "Fake" UGV pos (compared to DRTLS UWB)
+            self.ugv_uwb_pos = PoseStamped()
+            self.ugv_uwb_pos.header.stamp = rospy.Time.now()
+            self.ugv_uwb_pos.pose.position.x = 0
+            self.ugv_uwb_pos.pose.position.y = 0
+            self.ugv_uwb_pos.pose.position.z = 0
 
-        # Again
-        est_arg = ( ground_distances[0]**2 + self.ugv_y0**2 - ground_distances[1] **2 ) / (2 * ground_distances[0] * self.ugv_y0 )
-        if est_arg > -1 and est_arg < 1 :
-            est_theta = math.acos( est_arg )
-            est_x += ground_distances[0] * math.sin(est_theta)
-            est_y += ground_distances[0] * math.cos(est_theta)
-            est_cnt += 1
+            # "Fake" UAV pos (compared to DRTLS UWB)
+            self.uav_uwb_pos = PoseStamped()
+            self.ugv_uav_pos.header.stamp = rospy.Time.now()
+            self.ugv_uwb_pos.pose.position.x = est_relative_pos[0]
+            self.ugv_uwb_pos.pose.position.y = est_relative_pos[1]
+            self.ugv_uwb_pos.pose.position.z = self.lidarz
 
-        # And again
-        print( ( ground_distances[3]**2 + self.ugv_y0**2 - ground_distances[2] **2 ) / (2 * ground_distances[3] * self.ugv_y0 ) )
-        est_arg = ( ground_distances[3]**2 + self.ugv_y0**2 - ground_distances[2] **2 ) / (2 * ground_distances[3] * self.ugv_y0 )
-        if est_arg > -1 and est_arg < 1 :
-            est_theta = math.acos( est_arg )
-            est_x += ground_distances[0] * math.sin(est_theta) + self.ugv_x0
-            est_y += ground_distances[0] * math.cos(est_theta)
-            est_cnt += 1
-
-        est_relative_pos = numpy.array([est_x, est_y]) / est_cnt
-
-        print("Position estimates: ({})".format(est_relative_pos))
+        else :
+            rospy.logerr("Could not triangulate with any pair of UGV transceivers.")
 
     def publish_dist_to_target(self, target) :
         '''
@@ -248,21 +282,23 @@ class LandingControl() :
         '''
             Update objective waypoint in order to move towards target and land (timer callback)
         '''
-        self.calculate_relative_uwb_poses()
-        return
         self.objective = PoseStamped()
 
-        if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay)  and not self.using_custom_uwb :
+        if self.using_custom_uwb :
+
+            # Check at least two ranges are available
+            self.check_min_uwb_ranges()
+            if self.min_uwb_ranges :
+                self.calculate_relative_uwb_poses()
+
+        if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
             self.publishing_objective = False
-            # if self.publishing_objective :
             rospy.logwarn("Not receiving UGV UWB pose updates...")
         elif rospy.Time.now() - self.uav_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay)  and not self.using_custom_uwb :
             self.publishing_objective = False
-            # if self.publishing_objective :
             rospy.logwarn("Not receiving UAV UWB pose updates...")
         elif rospy.Time.now() - self.pos.header.stamp > rospy.Duration(self.max_pos_delay)  and not self.using_custom_uwb :
             self.publishing_objective = False
-            # if self.publishing_objective :
             rospy.logwarn("Not receiving MAVROS local POS update...")
         else :
             self.publishing_objective = True
@@ -318,9 +354,10 @@ class LandingControl() :
         self.dist_to_target_timer = rospy.Timer(rospy.Duration(0.1), self.publish_dist_to_target)
 
         # Wait until objective is being published
-        while not self.publishing_objective and not self.using_custom_uwb :
+        while not self.publishing_objective and not (self.using_custom_uwb and self.min_uwb_ranges) :
             rospy.loginfo("Waiting for all control data to be available...")
             flag_check_rate.sleep()
+            self.check_min_uwb_ranges()
 
         # Set offboard mode to external
         rospy.loginfo("Setting offboard mode to external...")
