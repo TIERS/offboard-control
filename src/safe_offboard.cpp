@@ -29,11 +29,16 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, &safe_offboard::state_cb, this);
     position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("mavros/vision_pose/pose", 10, &safe_offboard::update_current_pos, this);
     external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("offboard/command_waypoint", 10, &safe_offboard::update_external_waypoint, this);
+
     waypoint_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
+    offboard_state_pub_ = nh_.advertise<std_msgs::String>("safe_offboard_mode", 10);
     arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
     set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
     emergency_land_server_ = nh_.advertiseService("offboard/emergency_land", &safe_offboard::emergency_srv_cb, this);
     flight_mode_sub_ = nh_.subscribe<std_msgs::String>("offboard/mode", 10, &safe_offboard::mode_cb, this);
+
+    flight_mode_srv_ = nh_.advertiseService("offboard/cmd/mode", &safe_offboard::flight_mode_srv_cb, this);
+    offboard_state_srv_ = nh_.advertiseService("offboard/state", &safe_offboard::offboard_state_srv_cb, this);
 }
 
 safe_offboard::~safe_offboard()
@@ -57,26 +62,106 @@ void safe_offboard::mode_cb(const std_msgs::String::ConstPtr& msg)
     {
         flight_mode_ = "land";
     }
-    if (msg->data == "stay")
+    else if (msg->data == "stay")
     {
         flight_mode_ = "stay";
     }
-    if (msg->data == "hover")
+    else if (msg->data == "hover")
     {
         flight_mode_ = "hover";
     }
-    if (msg->data == "circle")
+    else if (msg->data == "circle")
     {
         flight_mode_ = "circle";
     }
-    if (msg->data == "external_control")
+    else if (msg->data == "external_control")
     {
         flight_mode_ = "external_control";
     }
-    
+    else{
+        // keep the last mode
+    }
 }
 
- bool safe_offboard::emergency_srv_cb(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response){
+
+bool safe_offboard::flight_mode_srv_cb(offboard_control::flight_mode::Request &request, offboard_control::flight_mode::Response &response)
+{
+    if (request.mode == "land")
+    {
+        flight_mode_ = "land";
+    }
+    else if (request.mode == "stay")
+    {
+        flight_mode_ = "stay";
+    }
+    else if (request.mode == "hover")
+    {
+        flight_mode_ = "hover";
+    }
+    else if (request.mode == "circle")
+    {
+        flight_mode_ = "circle";
+    }
+    else if (request.mode == "external_control")
+    {   
+        if(offboard_state_ == "flying"))
+            flight_mode_ = "external_control";
+        else
+        {
+            response.feedback = "UAV Is Not in "flying" state, Flight Mode Set Failed.";
+            return false;
+        }
+    }
+    else{
+        response.feedback = "Flight Mode Set Succeeded.";
+        return false;
+    }
+    
+    response.feedback = "Flight Mode Set Succeeded.";;
+    return true;
+}
+
+
+bool safe_offboard::offboard_state_srv_cb(offboard_control::offboard_state::Request &request, offboard_control::offboard_state::Response &response)
+{
+    if (request.state == "disarmed")
+    {
+        offboard_state_ = "disarmed";
+    }
+    else if (request.state == "armed")
+    {
+        offboard_state_ = "armed";
+    }
+    else if (request.state == "taking_off")
+    {
+        offboard_state_ = "taking_off";
+    }
+    else if (request.state == "flying")
+    {
+        offboard_state_ = "flying";
+    }
+    else if (request.state == "landing")
+    {
+        offboard_state_ = "landing";
+    }
+    else if(request.state == "emergency")
+    {
+        offboard_state_ = "emergency";
+    }
+    else if(request.state == "going_home")
+    {
+        offboard_state_ = "going_home";
+    }
+    else{
+        response.feedback = "Offboard State Set Failed";
+        return false;
+    }
+    
+    response.feedback = "Offboard State Set Succeeded";
+    return true;
+}
+
+bool safe_offboard::emergency_srv_cb(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response){
 //	try{
 		if (request.data)
 		{
@@ -320,7 +405,15 @@ void safe_offboard::check_poses(const ros::TimerEvent& event)
 }
 
 
-void safe_offboard::run(){
+void safe_offboard::pub_offboard_state(const ros::TimerEvent& event)
+{   
+    std_msgs::String msg;
+    msg.data = offboard_state_;
+    offboard_state_pub_.publish(msg);
+}
+
+void safe_offboard::run()
+{
     //the setpoint publishing rate MUST be faster than 2Hz required by offboard mode
     ros::Rate rate(20.0);
     
@@ -414,6 +507,7 @@ int main(int argc, char **argv)
     so.set_lower_fly_fence(fly_fence[0], fly_fence[1], fly_fence[2]);
     so.set_upper_fly_fence(fly_fence[3], fly_fence[4], fly_fence[5]);
     ros::Timer timer = n.createTimer(ros::Duration(0.05), &safe_offboard::check_poses, &so);
+    ros::Timer time_0 = n.createTimer(ros::Duration(0.5), &safe_offboard::pub_offboard_state, &so);
     so.run();
     
     ros::spin();

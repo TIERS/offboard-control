@@ -7,7 +7,8 @@
 #include <mavros_msgs/State.h>
 #include <std_srvs/SetBool.h>
 #include <std_msgs/String.h>
-
+#include "offboard_control/flight_mode.h"
+#include "offboard_control/offboard_state.h"
 
 struct point
 {
@@ -39,11 +40,17 @@ private:
 
     ros::Publisher waypoint_pub_;
 
+    ros::Publisher offboard_state_pub_;
+
     ros::ServiceClient arming_client_;
 
     ros::ServiceClient set_mode_client_;
 
     ros::ServiceServer emergency_land_server_;
+
+    ros::ServiceServer flight_mode_srv_;
+
+    ros::ServiceServer offboard_state_srv_;
 
 private:
     mavros_msgs::State current_state_;
@@ -89,6 +96,10 @@ public:
 
     void mode_cb(const std_msgs::String::ConstPtr& msg);
 
+    bool flight_mode_srv_cb(offboard_control::flight_mode::Request &request, offboard_control::flight_mode::Response &response);
+
+    bool offboard_state_srv_cb(offboard_control::offboard_state::Request &request, offboard_control::offboard_state::Response &response);
+
     bool emergency_srv_cb(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response);
 
     bool check_ext_position();
@@ -121,6 +132,8 @@ public:
     void set_lower_fly_fence(double x, double y, double z);
 
     void set_upper_fly_fence(double x, double y, double z);  
+
+    void pub_offboard_state(const ros::TimerEvent& event);
 
     void run(); 
 
