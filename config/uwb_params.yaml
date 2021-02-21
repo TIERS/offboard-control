@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 port: "/dev/ttyACM1"
 tag_name: "dronie"
+=======
+port: "/dev/uwb"
+tag_name: "tag"
+>>>>>>> xianjia-dev
 use_network: False
 network: "network0"
 verbose: False
