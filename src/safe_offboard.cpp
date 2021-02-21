@@ -34,6 +34,7 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     offboard_state_pub_ = nh_.advertise<std_msgs::String>("safe_offboard_state", 10);
     flight_mode_pub_ = nh_.advertise<std_msgs::String>("flight_mode", 10);
     arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
+    landing_client_ = nh_.serviceClient<mavros_msgs::CommandTOL>("mavros/cmd/land");
     set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
     emergency_land_server_ = nh_.advertiseService("offboard/emergency_land", &safe_offboard::emergency_srv_cb, this);
     flight_mode_sub_ = nh_.subscribe<std_msgs::String>("offboard/mode", 10, &safe_offboard::mode_cb, this);

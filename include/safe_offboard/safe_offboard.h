@@ -3,6 +3,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/CommandTOL.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
 #include <std_srvs/SetBool.h>
@@ -45,6 +46,8 @@ private:
     ros::Publisher offboard_state_pub_;
 
     ros::ServiceClient arming_client_;
+    
+    ros::ServiceClient landing_client_;
 
     ros::ServiceClient set_mode_client_;
 
