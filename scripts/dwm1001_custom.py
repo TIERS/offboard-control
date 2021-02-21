@@ -1,13 +1,7 @@
 #!/usr/bin/env python
-""" For more info on the documentation go to https://www.decawave.com/sites/default/files/dwm1001-api-guide.pdf
+""" 
+    For more info on the documentation go to https://www.decawave.com/sites/default/files/dwm1001-api-guide.pdf
 """
-
-__author__     = "Jorge Pena Queralta; Qingqing Li  "
-__version__    = "0.1"
-__maintainer__ = "Jorge Pena Queralta"
-__email__      = "jopequ@utu.fi, qingqli@utu.fi"
-__status__     = "Development"
-
 
 import rospy, time, serial, os, sys, random
 
@@ -96,12 +90,13 @@ class dwm1001_localizer:
         """
   
         arrayData = [x  for x in serialData.strip().split(' ')]
-        print(" Input : ", arrayData, "  length: ", len(arrayData))
+        if self.verbose :
+            print(" Input : ", arrayData, "  length: ", len(arrayData))
 
         if(len(arrayData) is not 5): 
             return
 
-        print(arrayData)
+        # print(arrayData)
 
         node_id = arrayData[1]
         first_time = False
@@ -119,7 +114,7 @@ class dwm1001_localizer:
                 print("Tag Name is ", tag_name)
             else:
                 print("WRONG INFO; Return !")
-                return;
+                return
 
             first_time = True
 
@@ -127,7 +122,8 @@ class dwm1001_localizer:
 
         try :
             dist = float(arrayData[4])
-            print("Publish distance topic : ", dist)
+            if self.verbose :
+                print("Publish distance topic : ", dist)
             self.topics[node_id].publish(dist)
         except :
             pass
