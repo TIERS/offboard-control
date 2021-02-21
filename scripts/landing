@@ -2,7 +2,7 @@
 
 import os
 import sys
-import paho
+import time
 import rospy
 import numpy
 
@@ -10,6 +10,8 @@ from std_msgs.msg       import String
 from nav_msgs.msg       import Odometry
 from sensor_msgs.msg    import Range
 from geometry_msgs.msg  import PoseStamped
+
+from offboard_control.srv  import offboard_state
 
 class LandingControl() :
 
@@ -46,7 +48,7 @@ class LandingControl() :
         # Publish distance to target in a topic
         self.dist_to_target_topic = rospy.get_param("~dist_to_target_topic", "landing/distance")
         self.dist_to_target = -1
-        self.dist_to_target_pub = rospy.Publisher(self.dist_to_target, Range, queue_size=10)
+        self.dist_to_target_pub = rospy.Publisher(self.dist_to_target_topic, Range, queue_size=10)
 
         # Get pos from PX4 EKF2 that already integrates VIO and/or others
         self.local_pos_topic =  rospy.get_param("~local_pos_topic", "/uav/mavros/local_position/pose")
@@ -59,8 +61,9 @@ class LandingControl() :
         while not self.pos.header.stamp :
             sys.stdout.write("..")
             sys.stdout.flush()
+            time.sleep(0.1)
         self.home_pos = self.pos
-        rospy.loginfo("Home position locked: {}".format(self.pos))
+        rospy.loginfo("Home position locked: \n{}".format(self.pos.pose))
 
         # UWB Subscribers
         self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
@@ -79,6 +82,7 @@ class LandingControl() :
         self.ugv_vio_subscriber = rospy.Subscriber(self.ugv_vio_topic, Odometry, self.ugv_vio_cb)
 
         # Publisher for actual control
+        self.publishing_objective = False
         self.waypoint_pub_topic = rospy.get_param('~waypoint_pub_topic', "/dwm1001/tag/dronie/position")
         self.control_pub = rospy.Publisher(self.waypoint_pub_topic, PoseStamped, queue_size=10)
         
@@ -90,7 +94,7 @@ class LandingControl() :
         self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
 
         # Service for changing to external offboard mode
-        self.set_ofboard_mode_client  = rospy.ServiceProxy("offboard/cmd/mode", String)
+        self.set_ofboard_mode_client  = rospy.ServiceProxy("/uav/offboard/cmd/mode", offboard_state)
 
     def update_current_pos_cb(self, pos) :
         '''
@@ -122,7 +126,7 @@ class LandingControl() :
         '''
         self.ugv_vio_pos = odom
 
-    def publish_dist_to_target(self) :
+    def publish_dist_to_target(self, target) :
         '''
             Publish distance to target (timer callback)
         '''
@@ -131,21 +135,21 @@ class LandingControl() :
         r.range = self.dist_to_target
         self.dist_to_target_pub.publish(r)
 
-    def update_objective(self) :
+    def update_objective(self, target) :
         '''
             Update objective waypoint in order to move towards target and land (timer callback)
         '''
         self.objective = PoseStamped()
 
-        if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > self.max_pos_delay :
+        if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
             self.publishing_objective = False
             if self.publishing_objective :
                 rospy.logwarn("Not receiving UGV UWB pose updates...")
-        elif rospy.Time.now() - self.uav_uwb_pos.header.stamp > self.max_pos_delay :
+        elif rospy.Time.now() - self.uav_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
             self.publishing_objective = False
             if self.publishing_objective :
                 rospy.logwarn("Not receiving UAV UWB pose updates...")
-        elif rospy.Time.now() - self.pos.header.stamp > self.max_pos_delay :
+        elif rospy.Time.now() - self.pos.header.stamp > rospy.Duration(self.max_pos_delay) :
             self.publishing_objective = False
             if self.publishing_objective :
                 rospy.logwarn("Not receiving MAVROS local POS update...")
@@ -209,7 +213,7 @@ class LandingControl() :
         rospy.loginfo("Setting offboard mode to external...")
         rospy.wait_for_service('offboard/cmd/mode')
         try:
-            self.set_ofboard_mode_client(request=String("external_control"))
+            self.set_ofboard_mode_client(request=offboard_state(state="external_control"))
         except rospy.ServiceException as e:
             print("Service failed: {}. Offboard mode cannot be changed to external control.".format(e))
 

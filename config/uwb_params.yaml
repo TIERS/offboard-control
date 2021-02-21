@@ -1,0 +1,5 @@
+port: "/dev/ttyACM1"
+tag_name: "tag"
+use_network: False
+network: "network0"
+verbose: True
