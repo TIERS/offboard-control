@@ -11,6 +11,7 @@ position_to_mavros::position_to_mavros(ros::NodeHandle& nh){
     nhh.param<std::string>("uwb_sub_topic", uwb_sub_topic_, "/dwm1001/tag/dronie/position");
     nhh.param<std::string>("vision_sub_topic", vision_sub_topic_, "/uav/t265/odom/sample");
     nhh.param<std::string>("lidar_sub_topic", lidar_sub_topic_, "/uav/tfmini_ros_node/range");
+    
 
     local_pos_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(pose_pub_topic_, 5);
     if(!vision_only_){
@@ -21,6 +22,8 @@ position_to_mavros::position_to_mavros(ros::NodeHandle& nh){
     vision_sub_ = nh_.subscribe<nav_msgs::Odometry>(vision_sub_topic_, 1, &position_to_mavros::vision_callback, this); 
     
     lidar_z_ = 0.0;
+
+    landing_client_ = nh_.serviceClient<mavros_msgs::CommandTOL>("mavros/cmd/land");
 
 }
 
@@ -64,6 +67,22 @@ void position_to_mavros::run(const ros::TimerEvent& event){
 
     // -0.13 0.0 -0.12 
     //ROS_INFO_STREAM(">>>>>> " << "Before Vision Pose: " << vision_pos_.pose.position.x << " ," <<vision_pos_.pose.position.y << " ," <<vision_pos_.pose.position.z << " <<<<<<");
+    if((ros::Time::now() - vision_pos_.header.stamp) > ros::Duration(0.2))
+    { // if the vision pos is too old, do emergency landing.
+        mavros_msgs::CommandTOL srv_land;
+        srv_land.request.altitude = 0;
+        srv_land.request.latitude = 0;
+        srv_land.request.longitude = 0;
+        srv_land.request.min_pitch = 0;
+        srv_land.request.yaw = 0;
+        if(landing_client_.call(srv_land))
+        {
+            ROS_INFO_STREAM("Vision Pose Stopped, Land.");
+        }else
+        {
+            ROS_ERROR_STREAM("Vision Pose Stopped, Failed to Call Land Service!");
+        }
+    }
     geometry_msgs::PoseStamped transformed_pos;
     geometry_msgs::TransformStamped T;
     const geometry_msgs::PoseStamped& older_pos = vision_pos_;
