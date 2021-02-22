@@ -3,8 +3,8 @@ ugv_uwb_topic:        "/dwm1001/tag/ugv/position"
 
 local_pos_topic:      "mavros/local_position/pose"
 waypoint_pub_topic:   "offboard/command_waypoint"
-offboard_mode_topic:  "offboard/mode"
-offboard_state_topic: "safe_offboard_state"
+change_mode_topic:    "offboard/mode/change"
+offboard_state_topic: "offboard/state"
 offboard_mode_topic:  "offboard/mode"
 
 dist_to_target_topic: "landing/distance"
@@ -21,3 +21,4 @@ closing_dist:         1.5
 landing_dist:         0.1
 
 min_accumulated_meas: 20
+min_intermeas_dist:   0.2
