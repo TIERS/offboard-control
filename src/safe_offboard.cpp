@@ -5,6 +5,7 @@
 safe_offboard::safe_offboard(ros::NodeHandle& nh)
 {
     nh_ = nh;
+    ros::NodeHandle nhh("~");
     offb_set_mode_.request.custom_mode = "OFFBOARD";
     arm_cmd_.request.value = true;
     emergency_landing_ = false;
@@ -16,8 +17,6 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     flight_mode_ = "stay";
     takeoff_height_ = 1.0;
     circle_radius_ = 1.0;
-    fly_fence_.lower_point = point{-2.0,-2.0, 0.0};
-    fly_fence_.upper_point = point{ 2.0, 2.0, 2.0};
     pos_valid_time_ = 1.0;
     waypoint_valid_time_ = 1.0;
     emergency_landing_ = false;
@@ -25,22 +24,63 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
 
     offboard_state_ = "disarmed"; // ["disarmed", "armed", "taking_off", "flying", "landing", "emergency", "going_home"]
 
+    std::vector<double> fly_fence {-2.0,-2.0, 0.0, 2.0, 2.0, 2.0};
+    nh.param<double>("takeoff_height", takeoff_height_, 1.23);
+    nh.param<double>("circle_radius", circle_radius_, 1.23);
+    nh.param<std::string>("flight_mode", flight_mode_, std::string("stay"));
+    nh.param<double>("pos_valid_time", pos_valid_time_, 1.0);
+    nh.param<double>("waypoint_valid_time", waypoint_valid_time_, 1.0);
+    nh.getParam("fly_fence",fly_fence);
+    fly_fence_.lower_point = point{fly_fence[0], fly_fence[1], fly_fence[2]};
+    fly_fence_.upper_point = point{fly_fence[3], fly_fence[4], fly_fence[5]};
 
-    state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, &safe_offboard::state_cb, this);
-    position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("mavros/vision_pose/pose", 10, &safe_offboard::update_current_pos, this);
-    external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>("offboard/command_waypoint", 10, &safe_offboard::update_external_waypoint, this);
+    std::string mavros_state_sub_topic;
+    std::string mavros_position_sub_topic;
+    std::string external_waypoint_sub_topic; 
+    std::string waypoint_pub_topic;
+    std::string offboard_state_pub_topic;
+    std::string flight_mode_pub_topic;
+    std::string arming_client_topic;
+    std::string landing_client_topic; 
+    std::string mavros_set_mode_client_topic;
+    std::string emergency_land_server_topic;
+    std::string flight_mode_sub_topic;
+    std::string flight_mode_srv_topic;
+    std::string offboard_state_srv_topic;
 
-    waypoint_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
-    offboard_state_pub_ = nh_.advertise<std_msgs::String>("safe_offboard_state", 10);
-    flight_mode_pub_ = nh_.advertise<std_msgs::String>("flight_mode", 10);
-    arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
-    landing_client_ = nh_.serviceClient<mavros_msgs::CommandTOL>("mavros/cmd/land");
-    set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
-    emergency_land_server_ = nh_.advertiseService("offboard/emergency_land", &safe_offboard::emergency_srv_cb, this);
-    flight_mode_sub_ = nh_.subscribe<std_msgs::String>("offboard/mode", 10, &safe_offboard::mode_cb, this);
+    nhh.param<std::string>("mavros_state_sub_topic", mavros_state_sub_topic, "mavros/state");
+    nhh.param<std::string>("mavros_position_sub_topic", mavros_position_sub_topic, "mavros/vision_pose/pose");
+    nhh.param<std::string>("external_waypoint_sub_topic", external_waypoint_sub_topic, "offboard/command_waypoint");
+    nhh.param<std::string>("waypoint_pub_topic", waypoint_pub_topic, "mavros/setpoint_position/local");
 
-    flight_mode_srv_ = nh_.advertiseService("offboard/cmd/mode", &safe_offboard::flight_mode_srv_cb, this);
-    offboard_state_srv_ = nh_.advertiseService("offboard/state", &safe_offboard::offboard_state_srv_cb, this);
+    nhh.param<std::string>("offboard_state_pub_topic", offboard_state_pub_topic, "safe_offboard_state");
+    nhh.param<std::string>("flight_mode_pub_topic", flight_mode_pub_topic, "flight_mode");
+    nhh.param<std::string>("arming_client_topic", arming_client_topic, "mavros/cmd/arming");
+    nhh.param<std::string>("landing_client_topic", landing_client_topic, "mavros/cmd/land");
+
+    nhh.param<std::string>("mavros_set_mode_client_topic", mavros_set_mode_client_topic, "mavros/set_mode");
+    nhh.param<std::string>("emergency_land_server_topic", emergency_land_server_topic, "offboard/emergency_land");
+    nhh.param<std::string>("flight_mode_sub_topic", flight_mode_sub_topic, "offboard/mode");
+    nhh.param<std::string>("flight_mode_srv_topic", flight_mode_srv_topic, "offboard/cmd/mode");
+    nhh.param<std::string>("offboard_state_srv_topic", offboard_state_srv_topic, "offboard/state");
+
+
+
+    state_sub_ = nh_.subscribe<mavros_msgs::State>(mavros_state_sub_topic, 10, &safe_offboard::state_cb, this);
+    position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>(mavros_position_sub_topic, 10, &safe_offboard::update_current_pos, this);
+    external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>(external_waypoint_sub_topic, 10, &safe_offboard::update_external_waypoint, this);
+
+    waypoint_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(waypoint_pub_topic, 10);
+    offboard_state_pub_ = nh_.advertise<std_msgs::String>(offboard_state_pub_topic, 10);
+    flight_mode_pub_ = nh_.advertise<std_msgs::String>(flight_mode_pub_topic, 10);
+    arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>(arming_client_topic);
+    landing_client_ = nh_.serviceClient<mavros_msgs::CommandTOL>(landing_client_topic);
+    set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>(mavros_set_mode_client_topic);
+    emergency_land_server_ = nh_.advertiseService(emergency_land_server_topic, &safe_offboard::emergency_srv_cb, this);
+    flight_mode_sub_ = nh_.subscribe<std_msgs::String>(flight_mode_sub_topic, 10, &safe_offboard::mode_cb, this);
+
+    flight_mode_srv_ = nh_.advertiseService(flight_mode_srv_topic, &safe_offboard::flight_mode_srv_cb, this);
+    offboard_state_srv_ = nh_.advertiseService(offboard_state_srv_topic, &safe_offboard::offboard_state_srv_cb, this);
 }
 
 safe_offboard::~safe_offboard()
@@ -488,29 +528,8 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "safe_offboard");
 
     ros::NodeHandle n;
-    ros::NodeHandle nh("~");
-
-    double takeoff_height;
-    double circle_radius;
-    std::string flight_mode;
-    double pos_valid_time;
-    double waypoint_valid_time;
-    std::vector<double> fly_fence{-1.0, -1.0, 0.0, 1.0, 1.0, 1.0};
-
-    nh.param<double>("takeoff_height", takeoff_height, 1.23);
-    nh.param<double>("circle_radius", circle_radius, 1.23);
-    nh.param<std::string>("flight_mode", flight_mode, std::string("stay"));
-    nh.param<double>("pos_valid_time", pos_valid_time, 1.0);
-    nh.param<double>("waypoint_valid_time", waypoint_valid_time, 1.0);
-    nh.getParam("fly_fence",fly_fence);
-
 
     safe_offboard so = safe_offboard(n);
-    so.set_flight_mode(flight_mode);
-    so.set_takeoff_height(takeoff_height);
-    so.set_circle_radius(circle_radius);
-    so.set_lower_fly_fence(fly_fence[0], fly_fence[1], fly_fence[2]);
-    so.set_upper_fly_fence(fly_fence[3], fly_fence[4], fly_fence[5]);
     ros::Timer timer = n.createTimer(ros::Duration(0.05), &safe_offboard::check_poses, &so);
     ros::Timer time_0 = n.createTimer(ros::Duration(0.5), &safe_offboard::pub_offboard_state, &so);
     so.run();

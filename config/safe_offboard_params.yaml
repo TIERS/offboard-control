@@ -1,3 +1,17 @@
+mavros_state_sub_topic: "mavros/state"
+mavros_position_sub_topic: "mavros/vision_pose/pose"
+external_waypoint_sub_topic: "offboard/command_waypoint"
+waypoint_pub_topic: "mavros/setpoint_position/local"
+offboard_state_pub_topic: "safe_offboard_state"
+flight_mode_pub_topic: "flight_mode"
+arming_client_topic: "mavros/cmd/arming"
+landing_client_topic: "mavros/cmd/land"
+mavros_set_mode_client_topic: "mavros/set_mode"
+emergency_land_server_topic: "offboard/emergency_land"
+flight_mode_sub_topic: "offboard/mode"
+flight_mode_srv_topic: "offboard/cmd/mode"
+offboard_state_srv_topic: "offboard/state"
+
 fly_time: 40
 flight_mode: "stay"
 takeoff_height: 1.0
