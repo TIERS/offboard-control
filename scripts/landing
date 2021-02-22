@@ -33,7 +33,9 @@ class LandingControl() :
         # Positions for navigation
         self.pos = PoseStamped()
         self.uav_uwb_pos = PoseStamped()
+        self.uav_uwb_pos_acc = [PoseStamped()]*3
         self.ugv_uwb_pos = PoseStamped()
+        self.ugv_uwb_pos_acc = [PoseStamped()]*10
         self.objective = PoseStamped()
 
         self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
@@ -114,7 +116,7 @@ class LandingControl() :
         self.custom_uwb_ranges = numpy.ones(4)
         self.custom_uwb_stamps = [rospy.Time()] * 4
         self.num_uwb_in_use = 4
-        self.using_custom_uwb = True    # Do not use Decawave's DRTLS
+        self.using_custom_uwb = False    # Do not use Decawave's DRTLS
         self.min_uwb_ranges = False     # At least 2 transceivers should be active...
 
         self.ugv_x0 = 0.6
@@ -143,12 +145,14 @@ class LandingControl() :
             Update UAV UWB position (callback)
         '''
         self.uav_uwb_pos = pos
+        self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(pos)
         
     def ugv_uwb_cb(self, pos) :
         '''
             Update UGV UWB position (callback)
         '''
         self.ugv_uwb_pos = pos
+        self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(pos)
 
     def update_offboard_state_cb(self, state) :
         '''
@@ -222,12 +226,12 @@ class LandingControl() :
         '''
             Calculates where the drone locate of the tage, top-right, top-left, bottom-right, bottom-left
         '''
-        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[1] and custom_uwb_ranges[1] > abs(self.ugv_y0)  \
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[1] and custom_uwb_ranges[1] > abs(self.ugv_y0))  \
            or (self.custom_uwb_ranges[3] >= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_y0)): 
             y = 1
         else:
             y = -1
-        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[3] and custom_uwb_ranges[3] > abs(self.ugv_x0)  \
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[3] and custom_uwb_ranges[3] > abs(self.ugv_x0))  \
            or (self.custom_uwb_ranges[1] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_x0)): 
             x = -1
         else:
@@ -327,8 +331,21 @@ class LandingControl() :
             ])
             move_dir = ugv_pos - uav_pos
             self.dist_to_target = numpy.linalg.norm(move_dir)
-            if self.dist_to_target > 0.05 :
+            if self.dist_to_target > self.landing_dist :
                 move_dir = self.waypoint_step * move_dir / self.dist_to_target
+            else :
+                ugv_poses = numpy.array([[
+                    pos.pose.position.x,
+                    pos.pose.position.y
+                ] for pos in self.ugv_uwb_pos_acc])
+                uav_poses = numpy.array([[
+                    pos.pose.position.x,
+                    pos.pose.position.y
+                ] for pos in self.uav_uwb_pos_acc])
+                ugv_pos = ugv_poses.mean(axis=0)
+                uav_pos = uav_poses.mean(axis=0)
+                move_dir = ugv_pos - uav_pos
+                self.dist_to_target = numpy.linalg.norm(move_dir)
             
             self.objective = self.pos
             self.objective.header.stamp = rospy.Time.now()
@@ -339,7 +356,7 @@ class LandingControl() :
                 self.objective.pose.position.z = self.approaching_altitude
             elif self.dist_to_target > self.landing_dist :
                 self.objective.pose.position.z = self.closing_altitude
-            elif self.dist_to_target <= self.landing_dist and self.dist_to_target > 0 :
+            elif self.dist_to_target <= self.landing_dist and self.dist_to_target >= 0 :
                 self.objective.pose.position.z = self.landing_altitude
             else :
                 rospy.logerr("Distance to target of {} does not make sense...".format(self.dist_to_target))

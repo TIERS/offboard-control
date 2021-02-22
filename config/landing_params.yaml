@@ -18,7 +18,7 @@ closing_altitude:     0.8
 landing_altitude:     0.45
 
 closing_dist:         1.5
-landing_dist:         0.1
+landing_dist:         0.6
 
 min_accumulated_meas: 20
 min_intermeas_dist:   0.2
