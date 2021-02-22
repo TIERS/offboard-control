@@ -123,7 +123,7 @@ class LandingControl() :
         # UWB pairs to calculate relative pos and average
         # 3rd element means x is calculated with cos (+1) or sin (-1)
         # 4th, 5th elements have to be added to x,y respectively
-        # 6th element is the third side of the traingle to estimate angle
+        # 6th element is the third side of the triangle to estimate angle
         self.uwb_pairs = [
             [0, 3, 1, 0, 0, self.ugv_x0],
             [1, 2, 1, 0, self.ugv_y0, self.ugv_x0],
@@ -158,7 +158,7 @@ class LandingControl() :
 
     def ugv_vio_cb(self, odom) :
         '''
-            Updata UGV VIO odom (callback)
+            Update UGV VIO odom (callback)
         '''
         self.ugv_vio_pos = odom
 
@@ -202,7 +202,7 @@ class LandingControl() :
         '''
             Update ground truth position
         '''
-        self.lidarz = pos.range
+        self.lidarz = range.range
 
     def check_min_uwb_ranges(self) :
         '''
@@ -218,7 +218,22 @@ class LandingControl() :
         else :
             self.min_uwb_ranges = False
 
-
+    def calculate_drone_locate_area(self):
+        '''
+            Calculates where the drone locate of the tage, top-right, top-left, bottom-right, bottom-left
+        '''
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[1] and custom_uwb_ranges[1] > abs(self.ugv_y0)  \
+           or (self.custom_uwb_ranges[3] >= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_y0)): 
+            y = 1
+        else:
+            y = -1
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[3] and custom_uwb_ranges[3] > abs(self.ugv_x0)  \
+           or (self.custom_uwb_ranges[1] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_x0)): 
+            x = -1
+        else:
+            x = 1
+        return (x, y)
+        
     def calculate_relative_uwb_poses(self) :
         '''
             Calculates relative UGV-UAV position based on 2-4 transceivers on the UGV
@@ -232,7 +247,7 @@ class LandingControl() :
         # UWB pairs to calculate relative pos and average
         # 3rd element means x is calculated with cos (+1) or sin (-1)
         # 4th, 5th elements have to be added to x,y respectively (offsets)
-        # 6th element is the third side of the traingle to estimate angle
+        # 6th element is the third side of the triangle to estimate angle
         diffs = [rospy.Time.now() - stamp - rospy.Duration(self.max_pos_delay) for stamp in self.custom_uwb_stamps]
         for pair in self.uwb_pairs :
             if diffs[pair[0]] < rospy.Duration(0) and diffs[pair[1]] < rospy.Duration(0) :
@@ -260,8 +275,8 @@ class LandingControl() :
             self.ugv_uwb_pos.pose.position.z = 0
 
             # "Fake" UAV pos (compared to DRTLS UWB)
-            self.uav_uwb_pos = PoseStamped()
-            self.ugv_uav_pos.header.stamp = rospy.Time.now()
+            self.ugv_uwb_pos = PoseStamped()
+            self.ugv_uwv_pos.header.stamp = rospy.Time.now()
             self.ugv_uwb_pos.pose.position.x = est_relative_pos[0]
             self.ugv_uwb_pos.pose.position.y = est_relative_pos[1]
             self.ugv_uwb_pos.pose.position.z = self.lidarz
