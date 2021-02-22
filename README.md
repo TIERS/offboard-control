@@ -13,7 +13,7 @@ sudo apt install ros-melodic-mavros ros-melodic-mavros-extras
 
 ## Installation of Simulation Environment
 
-Full instructions are available here: (https://dev.px4.io/master/en/simulation/ros_interface.html)[https://dev.px4.io/master/en/simulation/ros_interface.html]
+Full instructions are available here: [https://dev.px4.io/master/en/simulation/ros_interface.html](https://dev.px4.io/master/en/simulation/ros_interface.html)
 
 
 Install geographiclib
