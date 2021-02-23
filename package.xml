@@ -53,9 +53,12 @@
   <build_depend>mavros</build_depend>
   <build_depend>mavros_msgs</build_depend>
   <build_depend>roscpp</build_depend>
+  <build_depend>pcl</build_depend>
+  <build_depend>pcl_ros</build_depend>
   <build_depend>rospy</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>message_generation</build_depend>
+  <build_depend>sensor_msgs</build_depend>
   <build_export_depend>geometry_msgs</build_export_depend>
   <build_export_depend>mavros</build_export_depend>
   <build_export_depend>mavros_msgs</build_export_depend>
@@ -71,6 +74,9 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>message_runtime</exec_depend>
+  <exec_depend>pcl</exec_depend>
+  <exec_depend>pcl_ros</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

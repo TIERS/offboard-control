@@ -1,0 +1,18 @@
+<launch>
+   <group ns="pc_filter">
+      <param name="xpassthrough/filter_limit_min" value="-0.5" />
+      <param name="ypassthrough/filter_limit_min" value="-0.5" />
+      <param name="zpassthrough/filter_limit_min" value="0.2" />
+      <param name="xpassthrough/filter_limit_max" value="0.5" />
+      <param name="ypassthrough/filter_limit_max" value="0.5" />
+      <param name="zpassthrough/filter_limit_max" value="1.0" />
+      
+      <param name="observed_frame_id" value="camera_depth_optical_frame" />
+      <param name="filtered_frame_id" value="camera_depth_optical_frame" />
+      <param name="input_pc_topic" value="/camera/depth/color/points" />
+      <param name="output_pc_topic" value="/filtered_pc" />
+      <param name="ugv_center_xy_topic" value="/ugv_center" />
+
+      <node name="rs_pc_filter" pkg="pc_filter" type="pc_filter" output="screen"/>
+   </group>
+</launch>
