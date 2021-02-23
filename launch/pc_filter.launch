@@ -9,10 +9,10 @@
       
       <param name="observed_frame_id" value="camera_depth_optical_frame" />
       <param name="filtered_frame_id" value="camera_depth_optical_frame" />
-      <param name="input_pc_topic" value="/camera/depth/color/points" />
+      <param name="input_pc_topic" value="/uav/camera/depth/color/points" />
       <param name="output_pc_topic" value="/filtered_pc" />
       <param name="ugv_center_xy_topic" value="/ugv_center" />
 
-      <node name="rs_pc_filter" pkg="pc_filter" type="pc_filter" output="screen"/>
+      <node name="rs_pc_filter" pkg="offboard_control" type="pc_filter_node" output="screen"/>
    </group>
 </launch>

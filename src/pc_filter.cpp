@@ -93,6 +93,11 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
   double avg_x = sum_x / cloud_green_xyz->points.size();
   double avg_y = sum_y / cloud_green_xyz->points.size();
 
+  if(cloud_green_xyz->points.size() == 0){
+    ROS_INFO_STREAM("No Green Tag In the UGV Center");
+    return ;
+  }
+
   ROS_INFO_STREAM("Points Size: " << cloud_green_xyz->points.size());
   ROS_INFO_STREAM("Average x and y: " << avg_x << " , " << avg_y);
 

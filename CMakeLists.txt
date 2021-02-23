@@ -16,7 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   message_generation
-  PCL
+  # PCL
   sensor_msgs 
   pcl_ros
 )

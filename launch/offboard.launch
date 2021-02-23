@@ -21,6 +21,6 @@
         <arg name="enable_infra1"        default="false"/>
     </include>
 
-    <include file="$(find offboard_control)/launch/pc_filter.launch" />
+    <!--<include file="$(find offboard_control)/launch/pc_filter.launch" />-->
 
 </launch>
