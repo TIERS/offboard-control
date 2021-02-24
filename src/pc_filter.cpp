@@ -19,6 +19,9 @@ float y_clip_min_;
 float y_clip_max_;
 float z_clip_min_;
 float z_clip_max_;
+float dist_threshold_;
+int min_pts_;
+int max_pts_;
 
 int r_;
 int g_;
@@ -106,23 +109,23 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
     tree_search->setInputCloud(cloud_green_xyz);
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
-    ec.setClusterTolerance(0.03); 
-    ec.setMinClusterSize(10);
-    ec.setMaxClusterSize(300);
+    ec.setClusterTolerance(dist_threshold_);  
+    ec.setMinClusterSize(min_pts_);
+    ec.setMaxClusterSize(max_pts_);
     ec.setSearchMethod(tree_search);
     ec.setInputCloud(cloud_green_xyz);
     ec.extract(cluster_indices);
 
     ROS_INFO_STREAM("Cluster Size: " << cluster_indices.size());
-
-    std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
+    
     std::vector<int> big_cluster, small_cluster;
-    big_cluster = cluster_indices[0].indices;
-    small_cluster = cluster_indices[1].indices;
+
 
     // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_0(new pcl::PointCloud<pcl::PointXYZRGB>());
     // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_1(new pcl::PointCloud<pcl::PointXYZRGB>());
   if(cluster_indices.size() >=1 ){
+        std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
+        big_cluster = cluster_indices[0].indices;
         double sum_big_x = 0.0;
         double sum_big_y = 0.0;
         for (std::vector<int>::const_iterator pit = big_cluster.begin(); pit != big_cluster.end(); ++pit)
@@ -137,6 +140,7 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
 
       if(cluster_indices.size() > 1)
       {
+        small_cluster = cluster_indices[1].indices;
         double sum_small_x = 0.0;
         double sum_small_y = 0.0;
         for (std::vector<int>::const_iterator pit = small_cluster.begin(); pit != small_cluster.end(); ++pit)
@@ -193,6 +197,10 @@ int main(int argc, char **argv)
   n_.getParam("target_color/r", r_);
   n_.getParam("target_color/g", g_);
   n_.getParam("target_color/b", b_);
+  n_.getParam("cluster/dist_threshold", dist_threshold_);
+  n_.getParam("cluster/min_pts", min_pts_);
+  n_.getParam("cluster/max_pts", max_pts_);
+
 
   n_.getParam("observed_frame_id", observed_frame_id);
   n_.getParam("filtered_frame_id", filtered_frame_id);
