@@ -70,6 +70,49 @@ roslaunch realsense2_camera rs_camera.launch
 which will automatically detect the camera and output the corresponding serial number.
 
 
+
+
+## pc_filter node
+This node to filter a point cloud via a pass through filter and catch the center of our UGV through the green color in the center of you robot using realsense L515.
+
+
+
+### Parameters
+- `xpassthrough/filter_limit_min`: minimum x, anything below in x is filtered out
+- `xpassthrough/filter_limit_max`: max x, anything above in x is filtered out
+- `ypassthrough/filter_limit_min`: minimum y, anything below in y is filtered out
+- `ypassthrough/filter_limit_max`: max y, anything above in y is filtered out
+- `zpassthrough/filter_limit_min`: minimum z, anything below in z is filtered out
+- `zpassthrough/filter_limit_max`: max z, anything above in z is filtered out
+- `observed_frame_id`: This is the frame of reference for the original unfiltered point cloud
+- `filtered_frame_id`: This is the frame of reference that the filtered point cloud will be rebroadcast in
+- `input_pc_topic`: This is the ROS topic the unfiltered point cloud is being published on.
+- `output_pc_topic`: This is the ROS topic in which the filtered point cloud will be published.
+- ugv_center_xy_topic: This a the ROS topic in which the center of the UGV will be published.
+
+### Usage
+Place the following in a launch file:
+```
+   <group ns="pc_filter">
+      <param name="xpassthrough/filter_limit_min" value="-0.5" />
+      <param name="ypassthrough/filter_limit_min" value="-0.5" />
+      <param name="zpassthrough/filter_limit_min" value="0.2" />
+      <param name="xpassthrough/filter_limit_max" value="0.5" />
+      <param name="ypassthrough/filter_limit_max" value="0.5" />
+      <param name="zpassthrough/filter_limit_max" value="1.0" />
+      
+      <param name="observed_frame_id" value="camera_depth_optical_frame" />
+      <param name="filtered_frame_id" value="camera_depth_optical_frame" />
+      <param name="input_pc_topic" value="/camera/depth/color/points" />
+      <param name="output_pc_topic" value="/filtered_pc" />
+      <param name="ugv_center_xy_topic" value="/ugv_center" />
+
+      <node name="rs_pc_filter" pkg="pc_filter" type="pc_filter" output="screen"/>
+   </group>
+</launch>
+```
+
+
 ## Contact
 
 For any questions, write to `jopequ@utu.fi`.
