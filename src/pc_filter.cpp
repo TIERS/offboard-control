@@ -18,6 +18,10 @@ float y_clip_max_;
 float z_clip_min_;
 float z_clip_max_;
 
+int r_;
+int g_;
+int b_;
+
 std::string filtered_frame_id;
 std::string observed_frame_id;
 std::string input_pc_topic;
@@ -72,7 +76,7 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
     int r = cloud_filtered_xyz->points[i].r;
     int g = cloud_filtered_xyz->points[i].g;
     int b = cloud_filtered_xyz->points[i].b;
-    if (r < 80 && g > 120 && b < 40) {
+    if (r < r_ && g > g_ && b < b_) {
       inliers->indices.push_back(i);
     }
     
@@ -156,6 +160,9 @@ int main(int argc, char **argv)
   n_.getParam("ypassthrough/filter_limit_max", y_clip_max_);
   n_.getParam("zpassthrough/filter_limit_min", z_clip_min_);
   n_.getParam("zpassthrough/filter_limit_max", z_clip_max_);
+  n_.getParam("target_color/r", r_);
+  n_.getParam("target_color/g", g_);
+  n_.getParam("target_color/b", b_);
 
   n_.getParam("observed_frame_id", observed_frame_id);
   n_.getParam("filtered_frame_id", filtered_frame_id);
@@ -168,6 +175,7 @@ int main(int argc, char **argv)
   ROS_INFO_STREAM("Listening on this observed_frame_id: " << observed_frame_id);
   ROS_INFO_STREAM("Listening on this filtered_frame_id: " << filtered_frame_id);
   ROS_INFO_STREAM("Listening on this ugv_center_xy_topic: " << ugv_center_xy_topic);
+  ROS_INFO_STREAM("Listening on this targeted color rgb: " << r_ << " , " << g_ << " , " << b_ << input_pc_topic);
   ROS_INFO_STREAM("Dimensions for filtered scene are: (" << x_clip_min_ << ", " << x_clip_max_ << ") (" << y_clip_min_ << ", " << y_clip_max_ << ") (" << z_clip_min_ << ", " << z_clip_max_ << ")");
 
   ros::Time now = ros::Time::now();
