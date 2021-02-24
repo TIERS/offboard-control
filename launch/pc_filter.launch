@@ -6,15 +6,17 @@
       <param name="xpassthrough/filter_limit_max" value="0.5" />
       <param name="ypassthrough/filter_limit_max" value="0.5" />
       <param name="zpassthrough/filter_limit_max" value="1.0" />
-      <param name="target_color/r" value="80" />
-      <param name="target_color/g" value="120" />
+      <param name="target_color/r" value="30" />
+      <param name="target_color/g" value="50" />
       <param name="target_color/b" value="40" />
       
       <param name="observed_frame_id" value="camera_depth_optical_frame" />
       <param name="filtered_frame_id" value="camera_depth_optical_frame" />
-      <param name="input_pc_topic" value="/uav/camera/depth/color/points" />
+      <param name="input_pc_topic" value="/camera/depth/color/points" />
       <param name="output_pc_topic" value="/filtered_pc" />
       <param name="ugv_center_xy_topic" value="/ugv_center" />
+      <param name="uav_big_tag_xy_topic" value="/uav_big_tag_xy" />
+      <param name="uav_small_tag_xy_topic" value="/uav_small_tag_xy" />
 
       <node name="rs_pc_filter" pkg="offboard_control" type="pc_filter_node" output="screen"/>
    </group>
