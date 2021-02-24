@@ -120,41 +120,54 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
     
     std::vector<int> big_cluster, small_cluster;
 
-
     // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_0(new pcl::PointCloud<pcl::PointXYZRGB>());
     // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_1(new pcl::PointCloud<pcl::PointXYZRGB>());
-  if(cluster_indices.size() >=1 ){
-        std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
-        big_cluster = cluster_indices[0].indices;
-        double sum_big_x = 0.0;
-        double sum_big_y = 0.0;
-        for (std::vector<int>::const_iterator pit = big_cluster.begin(); pit != big_cluster.end(); ++pit)
-        {
-          // cloud_0->points.push_back(cloud_green_xyz->points[*pit]); 
-          sum_big_x += cloud_green_xyz->points[*pit].x;
-          sum_big_y += cloud_green_xyz->points[*pit].y;
-        }
-        avg_big_x = sum_big_x / big_cluster.size();
-        avg_big_y = sum_big_y / big_cluster.size();
-        ROS_INFO_STREAM("Big Tag: Points Size: " << big_cluster.size());
+  if(cluster_indices.size() >=1 )
+  {
 
-      if(cluster_indices.size() > 1)
+    std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
+    big_cluster = cluster_indices[0].indices;
+    double sum_big_x = 0.0;
+    double sum_big_y = 0.0;
+    for (std::vector<int>::const_iterator pit = big_cluster.begin(); pit != big_cluster.end(); ++pit)
+    {
+      // cloud_0->points.push_back(cloud_green_xyz->points[*pit]); 
+      sum_big_x += cloud_green_xyz->points[*pit].x;
+      sum_big_y += cloud_green_xyz->points[*pit].y;
+    }
+    avg_big_x = sum_big_x / big_cluster.size();
+    avg_big_y = sum_big_y / big_cluster.size();
+    ROS_INFO_STREAM("Big Tag: Points Size: " << big_cluster.size());
+
+    geometry_msgs::PoseStamped big_tag_msg;
+    big_tag_msg.header.stamp = ros::Time::now();
+    big_tag_msg.pose.position.x = avg_big_x;
+    big_tag_msg.pose.position.y = avg_big_y;
+    uav_big_tag_xy_pub.publish(big_tag_msg);
+
+    if(cluster_indices.size() > 1)
+    {
+      small_cluster = cluster_indices[1].indices;
+      double sum_small_x = 0.0;
+      double sum_small_y = 0.0;
+      for (std::vector<int>::const_iterator pit = small_cluster.begin(); pit != small_cluster.end(); ++pit)
       {
-        small_cluster = cluster_indices[1].indices;
-        double sum_small_x = 0.0;
-        double sum_small_y = 0.0;
-        for (std::vector<int>::const_iterator pit = small_cluster.begin(); pit != small_cluster.end(); ++pit)
-        {
-          // cloud_1->points.push_back(cloud_green_xyz->points[*pit]); 
-          sum_small_x += cloud_green_xyz->points[*pit].x;
-          sum_small_y += cloud_green_xyz->points[*pit].y;
-        }
-
-        avg_small_x = sum_small_x / small_cluster.size();
-        avg_small_y = sum_small_y / small_cluster.size();
-
-        ROS_INFO_STREAM("Small Tag: Points Size: " << small_cluster.size());
+        // cloud_1->points.push_back(cloud_green_xyz->points[*pit]); 
+        sum_small_x += cloud_green_xyz->points[*pit].x;
+        sum_small_y += cloud_green_xyz->points[*pit].y;
       }
+
+      avg_small_x = sum_small_x / small_cluster.size();
+      avg_small_y = sum_small_y / small_cluster.size();
+
+      ROS_INFO_STREAM("Small Tag: Points Size: " << small_cluster.size());
+
+      geometry_msgs::PoseStamped small_tag_msg;
+      small_tag_msg.header.stamp = ros::Time::now();
+      small_tag_msg.pose.position.x = avg_small_x;
+      small_tag_msg.pose.position.y = avg_small_y;
+      uav_small_tag_xy_pub.publish(small_tag_msg);
+    }
     }
   }
   else{
@@ -163,17 +176,7 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
 
   ROS_INFO_STREAM("Big Tag: Average x and y: " << avg_big_x << " , " << avg_big_y);
   ROS_INFO_STREAM("Small Tag: Average x and y: " << avg_small_x << " , " << avg_small_y);
-  geometry_msgs::PoseStamped big_tag_msg;
-  big_tag_msg.header.stamp = ros::Time::now();
-  big_tag_msg.pose.position.x = avg_big_x;
-  big_tag_msg.pose.position.y = avg_big_x;
-  uav_big_tag_xy_pub.publish(big_tag_msg);
 
-  geometry_msgs::PoseStamped small_tag_msg;
-  small_tag_msg.header.stamp = ros::Time::now();
-  small_tag_msg.pose.position.x = avg_small_x;
-  small_tag_msg.pose.position.y = avg_small_x;
-  uav_small_tag_xy_pub.publish(small_tag_msg);
 
   sensor_msgs::PointCloud2 cloud_back_msg;
   cloud_back_msg.header.frame_id = cloud_green_xyz->header.frame_id;

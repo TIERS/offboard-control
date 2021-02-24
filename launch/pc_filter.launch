@@ -9,8 +9,8 @@
       <param name="target_color/r" value="30" />
       <param name="target_color/g" value="50" />
       <param name="target_color/b" value="40" />
-      <param name="cluster/dist_threshold" value="0.01" />
-      <param name="cluster/min_pts" value="10" />
+      <param name="cluster/dist_threshold" value="0.02" />
+      <param name="cluster/min_pts" value="6" />
       <param name="cluster/max_pts" value="300" />
       
       <param name="observed_frame_id" value="camera_depth_optical_frame" />
