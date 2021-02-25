@@ -99,10 +99,6 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
   extract.setInputCloud(cloud_filtered_xyz);
   extract.setNegative(false);
   extract.filter(*cloud_green_xyz);
-  double avg_small_x = 99999.000;
-  double avg_small_y = 99999.000;
-  double avg_big_x = 99999.000;
-  double avg_big_y = 99999.000;
 
   if(cloud_green_xyz->points.size() >0){
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree_search(new pcl::search::KdTree<pcl::PointXYZRGB>);
@@ -124,7 +120,11 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
     // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_1(new pcl::PointCloud<pcl::PointXYZRGB>());
   if(cluster_indices.size() >=1 )
   {
-
+    double avg_small_x, avg_small_y, avg_big_x, avg_big_y;
+    // double avg_small_x = 99999.000;
+    // double avg_small_y = 99999.000;
+    // double avg_big_x = 99999.000;
+    // double avg_big_y = 99999.000;
     std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
     big_cluster = cluster_indices[0].indices;
     double sum_big_x = 0.0;
@@ -138,6 +138,7 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
     avg_big_x = sum_big_x / big_cluster.size();
     avg_big_y = sum_big_y / big_cluster.size();
     ROS_INFO_STREAM("Big Tag: Points Size: " << big_cluster.size());
+    ROS_INFO_STREAM("Big Tag: Average x and y: " << avg_big_x << " , " << avg_big_y);
 
     geometry_msgs::PoseStamped big_tag_msg;
     big_tag_msg.header.stamp = ros::Time::now();
@@ -161,6 +162,7 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
       avg_small_y = sum_small_y / small_cluster.size();
 
       ROS_INFO_STREAM("Small Tag: Points Size: " << small_cluster.size());
+      ROS_INFO_STREAM("Small Tag: Average x and y: " << avg_small_x << " , " << avg_small_y);
 
       geometry_msgs::PoseStamped small_tag_msg;
       small_tag_msg.header.stamp = ros::Time::now();
@@ -173,9 +175,6 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
   else{
     ROS_INFO_STREAM("No Green Tag In the UGV Center");
   }  
-
-  ROS_INFO_STREAM("Big Tag: Average x and y: " << avg_big_x << " , " << avg_big_y);
-  ROS_INFO_STREAM("Small Tag: Average x and y: " << avg_small_x << " , " << avg_small_y);
 
 
   sensor_msgs::PointCloud2 cloud_back_msg;

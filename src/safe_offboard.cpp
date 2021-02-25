@@ -24,15 +24,17 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
 
     offboard_state_ = "disarmed"; // ["disarmed", "armed", "taking_off", "flying", "landing", "emergency", "going_home"]
 
-    std::vector<double> fly_fence {-2.0,-2.0, 0.0, 2.0, 2.0, 2.0};
-    nh.param<double>("takeoff_height", takeoff_height_, 1.23);
-    nh.param<double>("circle_radius", circle_radius_, 1.23);
-    nh.param<std::string>("flight_mode", flight_mode_, std::string("stay"));
-    nh.param<double>("pos_valid_time", pos_valid_time_, 1.0);
-    nh.param<double>("waypoint_valid_time", waypoint_valid_time_, 1.0);
-    nh.getParam("fly_fence",fly_fence);
-    fly_fence_.lower_point = point{fly_fence[0], fly_fence[1], fly_fence[2]};
-    fly_fence_.upper_point = point{fly_fence[3], fly_fence[4], fly_fence[5]};
+    std::vector<double> flying_fence {-2.0,-2.0, 0.0, 2.0, 2.0, 2.0};
+    nhh.param<double>("takeoff_height", takeoff_height_, 1.23);
+    nhh.param<double>("circle_radius", circle_radius_, 1.23);
+    nhh.param<std::string>("flight_mode", flight_mode_, std::string("stay"));
+    nhh.param<double>("pos_valid_time", pos_valid_time_, 1.0);
+    nhh.param<double>("waypoint_valid_time", waypoint_valid_time_, 1.0);
+    nhh.getParam("fly_fence",flying_fence);
+    fly_fence_.lower_point = point{flying_fence[0], flying_fence[1], flying_fence[2]};
+    fly_fence_.upper_point = point{flying_fence[3], flying_fence[4], flying_fence[5]};
+    ROS_INFO_STREAM("fly fence lower point: " << fly_fence_.lower_point.x << " , " << fly_fence_.lower_point.y << " , " << fly_fence_.lower_point.z);
+    ROS_INFO_STREAM("fly fence upper point: " << fly_fence_.upper_point.x << " , " << fly_fence_.upper_point.y << " , " << fly_fence_.upper_point.z);
 
     std::string mavros_state_sub_topic;
     std::string mavros_position_sub_topic;

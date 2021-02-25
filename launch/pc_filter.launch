@@ -6,12 +6,12 @@
       <param name="xpassthrough/filter_limit_max" value="0.5" />
       <param name="ypassthrough/filter_limit_max" value="0.5" />
       <param name="zpassthrough/filter_limit_max" value="1.0" />
-      <param name="target_color/r" value="30" />
+      <param name="target_color/r" value="50" />
       <param name="target_color/g" value="50" />
-      <param name="target_color/b" value="40" />
-      <param name="cluster/dist_threshold" value="0.02" />
-      <param name="cluster/min_pts" value="6" />
-      <param name="cluster/max_pts" value="300" />
+      <param name="target_color/b" value="50" />
+      <param name="cluster/dist_threshold" value="0.05" />
+      <param name="cluster/min_pts" value="8" />
+      <param name="cluster/max_pts" value="1000" />
       
       <param name="observed_frame_id" value="camera_depth_optical_frame" />
       <param name="filtered_frame_id" value="camera_depth_optical_frame" />
