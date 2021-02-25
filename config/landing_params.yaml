@@ -15,11 +15,11 @@ landing_done_topic:   "landing/completed"
 
 max_pos_delay:        0.6
 
-waypoint_step:        0.2
+waypoint_step:        0.3
 
 approaching_altitude: 1.4
 closing_altitude:     0.8
-landing_altitude:     0.52
+landing_altitude:     1.2
 
 closing_dist:         1.5
 landing_dist:         0.8

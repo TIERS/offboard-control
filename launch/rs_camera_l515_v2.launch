@@ -3,7 +3,7 @@
   <arg name="usb_port_id"         default=""/>
   <arg name="device_type"         default=""/>
   <arg name="json_file_path"      default=""/>
-  <arg name="camera"              default="camera"/>
+  <arg name="camera"              default="l515"/>
   <arg name="tf_prefix"           default="$(arg camera)"/>
   <arg name="external_manager"    default="false"/>
   <arg name="manager"             default="realsense2_camera_manager"/>
@@ -13,8 +13,8 @@
   <arg name="fisheye_height"      default="480"/>
   <arg name="enable_fisheye"      default="false"/>
 
-  <arg name="depth_width"         default="1024"/>
-  <arg name="depth_height"        default="768"/>
+  <arg name="depth_width"         default="640"/>
+  <arg name="depth_height"        default="480"/>
   <arg name="enable_depth"        default="true"/>
 
   <arg name="infra_width"         default="640"/>
@@ -24,13 +24,13 @@
   <arg name="enable_infra2"       default="false"/>
   <arg name="infra_rgb"           default="false"/>
 
-  <arg name="color_width"         default="1920"/>
-  <arg name="color_height"        default="1080"/>
+  <arg name="color_width"         default="960"/>
+  <arg name="color_height"        default="540"/>
   <arg name="enable_color"        default="true"/>
 
-  <arg name="fisheye_fps"         default="30"/>
-  <arg name="depth_fps"           default="30"/>
-  <arg name="infra_fps"           default="30"/>
+  <arg name="fisheye_fps"         default="6"/>
+  <arg name="depth_fps"           default="6"/>
+  <arg name="infra_fps"           default="6"/>
   <arg name="color_fps"           default="6"/>
   <arg name="gyro_fps"            default="400"/>
   <arg name="accel_fps"           default="250"/>

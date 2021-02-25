@@ -45,7 +45,7 @@ class LandingControl() :
         # Control altitudes
         self.approaching_altitude = rospy.get_param("~approaching_altitude", 1.2)
         self.closing_altitude = rospy.get_param("~closing_altitude", 0.8)
-        self.landing_altitude = rospy.get_param("~landing_altitude", 0.48)
+        self.landing_altitude = rospy.get_param("~landing_altitude", 1.2)
 
         self.closing_dist = rospy.get_param("~closing_dist", 1)
         self.landing_dist = rospy.get_param("~landing_dist", 0.1)
@@ -110,7 +110,7 @@ class LandingControl() :
         self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
 
         # Service for changing to external offboard mode
-        self.pub_state_mode = rospy.Publisher('/uav/offboard/mode', String, queue_size=10)
+        self.pub_state_mode = rospy.Publisher('/uav/offboard/mode/change', String, queue_size=10)
         self.set_ofboard_mode_client  = rospy.ServiceProxy("/uav/offboard/cmd/mode", OffMode)
 
         # 1D lidar (height)

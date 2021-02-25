@@ -1,5 +1,7 @@
 <launch>
 
+    <include file="$(find offboard_control)/launch/rs_t265.launch"/>
+
     <node name="position_to_mavros" pkg="offboard_control" type="position_to_mavros_node" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/position_to_mavros_params.yaml" command="load"/>
     </node>
@@ -10,15 +12,6 @@
 
     <include file="$(find mavros)/launch/px4.launch">
         <arg name="fcu_url" default="/dev/pixhawk:57600" />
-    </include>
-
-    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
-        <arg name="camera"     value="t265" />
-        <arg name="serial_no"  value="947122110535" />
-        <arg name="enable_color"        default="false"/>
-        <arg name="enable_depth"        default="false"/>
-        <arg name="enable_infra2"        default="false"/>
-        <arg name="enable_infra1"        default="false"/>
     </include>
 
     <!--<include file="$(find offboard_control)/launch/pc_filter.launch" />-->
