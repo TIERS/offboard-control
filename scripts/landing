@@ -42,6 +42,14 @@ class LandingControl() :
         self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
         self.waypoint_step = rospy.get_param("~waypoint_step", 0.2)
 
+        # Attributes for multiple landing tests
+        self.landing_done_time = None
+        self.going_back_home = False
+        self.arrived_home_time = None
+        self.land_and_back_trip_count = 1
+        self.max_landing_trials = rospy.get_param("~max_landing_trials", 2)
+        self.min_landing_stationary_duration = rospy.get_param("~min_landing_stay", 2.0)
+
         # Control altitudes
         self.approaching_altitude = rospy.get_param("~approaching_altitude", 1.2)
         self.closing_altitude = rospy.get_param("~closing_altitude", 0.8)
@@ -297,11 +305,11 @@ class LandingControl() :
             self.ugv_uwb_pos.pose.position.z = 0
 
             # "Fake" UAV pos (compared to DRTLS UWB)
-            self.ugv_uwb_pos = PoseStamped()
-            self.ugv_uwv_pos.header.stamp = rospy.Time.now()
-            self.ugv_uwb_pos.pose.position.x = est_relative_pos[0]
-            self.ugv_uwb_pos.pose.position.y = est_relative_pos[1]
-            self.ugv_uwb_pos.pose.position.z = self.lidarz
+            self.uav_uwb_pos = PoseStamped()
+            self.uav_uwb_pos.header.stamp = rospy.Time.now()
+            self.uav_uwb_pos.pose.position.x = est_relative_pos[0]
+            self.uav_uwb_pos.pose.position.y = est_relative_pos[1]
+            self.uav_uwb_pos.pose.position.z = self.lidarz
 
         else :
             rospy.logerr("Could not triangulate with any pair of UGV transceivers.")
@@ -321,11 +329,68 @@ class LandingControl() :
         '''
         self.objective = PoseStamped()
 
+        # self.going_back_home = False
+        # self.landing_count = 0
+        # self.landing_stay_count = 0
+        # self.max_landing_trials = rospy.get_param("~max_landing_trials", 2)
+        # self.min_landing_stationary_duration = rospy.get_param("~min_landing_stay", 2)
+
+        if self.going_back_home :
+            self.objective = self.pos
+            self.objective.header.stamp = rospy.Time.now()
+            move_dir = numpy.array([
+                    -self.objective.pose.position.x,
+                    -self.objective.pose.position.y
+                ])
+            self.dist_to_home = numpy.linalg.norm(move_dir)
+
+            # Move or change back to landing
+            if self.dist_to_home < 0.3:
+                if self.arrived_home_time is None :
+                    self.arrived_home_time = rospy.Time.now()
+                elif rospy.Time.now() - self.arrived_home_time > rospy.Duration(self.min_landing_stationary_duration) :
+                    self.land_and_back_trip_count += 1
+                    if self.land_and_back_trip_count > self.max_landing_trials : 
+                        self.objective.z = 0
+                    else :
+                        self.going_back_home = False
+                        self.arrived_home_time = None
+
+                # Publish info
+                rospy.loginfo("Went back home for {}/{} trials. Staying stationary {}/{} seconds".format(
+                        self.land_and_back_trip_count, 
+                        self.max_landing_trials,
+                        rospy.Time.now() - self.arrived_home_time,
+                        self.min_landing_stationary_duration
+                    ))
+
+            else :
+                move_dir = self.waypoint_step * move_dir / self.dist_to_home
+
         if self.landing_done :
+
+            # Stay stationary
             self.objective = self.pose_when_landing
             self.objective.header.stamp = rospy.Time.now()
             self.control_pub.publish(self.objective)
-            self.landing_done_pub.publish(String(data="Landing completed. Waiting for manual docking..."))
+
+            # Check stationary duration before going back home            
+            if self.landing_done_time is None :
+                self.landing_done_time = rospy.Time.now()
+            elif rospy.Time.now() - self.landing_done_time > rospy.Duration(self.min_landing_stationary_duration) :
+                self.landing_done = False
+                self.landing_done_time = None
+                self.going_back_home = True
+
+            # Publish info
+            self.landing_done_pub.publish(
+                String(
+                    data = "Landing {} completed. Staying stationary {}/{} seconds".format(
+                        self.land_and_back_trip_count, 
+                        rospy.Time.now() - self.landing_done_time,
+                        self.min_landing_stationary_duration
+                    )
+                ))
 
         else :
 

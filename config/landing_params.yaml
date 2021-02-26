@@ -27,3 +27,6 @@ landing_stop_dist:    0.04
 
 min_accumulated_meas: 20
 min_intermeas_dist:   0.2
+
+max_landing_trials :  2
+min_landing_stay:     2
