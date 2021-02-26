@@ -330,19 +330,18 @@ class LandingControl() :
         '''
         self.objective = PoseStamped()
 
-        # self.going_back_home = False
-        # self.landing_count = 0
-        # self.landing_stay_count = 0
-        # self.max_landing_trials = rospy.get_param("~max_landing_trials", 2)
-        # self.min_landing_stationary_duration = rospy.get_param("~min_landing_stay", 2)
-
         if self.going_back_home :
+            rospy.loginfo("Going back home FLAG")
             self.objective = self.pos
             self.objective.pose.position.z = self.approaching_altitude
             self.objective.header.stamp = rospy.Time.now()
+            self.objective.pose.orientation.x = 0
+            self.objective.pose.orientation.y = 0
+            self.objective.pose.orientation.z = 0
+            self.objective.pose.orientation.w = 1
             move_dir = numpy.array([
-                    -self.objective.pose.position.x,
-                    -self.objective.pose.position.y
+                    -self.pos.pose.position.x,
+                    -self.pos.pose.position.y
                 ])
             self.dist_to_home = numpy.linalg.norm(move_dir)
 
@@ -353,7 +352,7 @@ class LandingControl() :
                 elif rospy.Time.now() - self.arrived_home_time > rospy.Duration(self.min_landing_stationary_duration) :
                     self.land_and_back_trip_count += 1
                     if self.land_and_back_trip_count > self.max_landing_trials : 
-                        self.objective.z = 0
+                        self.objective.pose.position.z = 0
                     else :
                         self.going_back_home = False
                         self.arrived_home_time = None
@@ -363,7 +362,7 @@ class LandingControl() :
                     rospy.loginfo("Went back home for {}/{} trials. Staying stationary {}/{} ms".format(
                             self.land_and_back_trip_count, 
                             self.max_landing_trials,
-                            int((rospy.Time.now() - self.arrived_home_time)/1000000),
+                            (rospy.Time.now() - self.arrived_home_time),
                             self.min_landing_stationary_duration*1000
                         ))
                 else :
@@ -371,12 +370,13 @@ class LandingControl() :
 
             else :
                 move_dir = self.waypoint_step * move_dir / self.dist_to_home
+                rospy.loginfo("Going back home... {}".format(move_dir))
 
             self.objective.pose.position.x += move_dir[0]
             self.objective.pose.position.y += move_dir[1]
             self.control_pub.publish(self.objective)
 
-        if self.landing_done :
+        elif self.landing_done :
 
             # Stay stationary
             self.objective = self.pose_when_landing
@@ -397,7 +397,7 @@ class LandingControl() :
                     String(
                         data = "Landing {} completed. Staying stationary {}/{} ms".format(
                             self.land_and_back_trip_count, 
-                            int((rospy.Time.now() - self.landing_done_time)/1000000),
+                            (rospy.Time.now() - self.landing_done_time),
                             self.min_landing_stationary_duration*1000
                         )
                     ))
@@ -456,7 +456,7 @@ class LandingControl() :
                         self.landing_done = True
                         self.pose_when_landing = self.pos
                         self.pose_when_landing.pose.position.z = self.landing_altitude
-                        print(self.pose_when_landing)
+                        # print(self.pose_when_landing)
                 
                 self.objective = self.pos
                 self.objective.header.stamp = rospy.Time.now()
