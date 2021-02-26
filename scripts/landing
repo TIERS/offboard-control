@@ -365,10 +365,12 @@ class LandingControl() :
                         self.min_landing_stationary_duration
                     ))
 
-            self.control_pub.publish(self.objective)
-
             else :
                 move_dir = self.waypoint_step * move_dir / self.dist_to_home
+
+            self.objective.pose.position.x += move_dir[0]
+            self.objective.pose.position.y += move_dir[1]
+            self.control_pub.publish(self.objective)
 
         if self.landing_done :
 
