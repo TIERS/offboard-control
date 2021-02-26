@@ -45,6 +45,7 @@ class LandingControl() :
         # Attributes for multiple landing tests
         self.landing_done_time = None
         self.going_back_home = False
+        self.dist_to_home = -1
         self.arrived_home_time = None
         self.land_and_back_trip_count = 1
         self.max_landing_trials = rospy.get_param("~max_landing_trials", 2)
@@ -346,7 +347,7 @@ class LandingControl() :
             self.dist_to_home = numpy.linalg.norm(move_dir)
 
             # Move or change back to landing
-            if self.dist_to_home < 0.3:
+            if self.dist_to_home < 0.3 and self.dist_to_home >= 0 :
                 if self.arrived_home_time is None :
                     self.arrived_home_time = rospy.Time.now()
                 elif rospy.Time.now() - self.arrived_home_time > rospy.Duration(self.min_landing_stationary_duration) :
