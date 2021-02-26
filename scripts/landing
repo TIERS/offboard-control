@@ -337,6 +337,7 @@ class LandingControl() :
 
         if self.going_back_home :
             self.objective = self.pos
+            self.objective.pose.position.z = self.approaching_altitude
             self.objective.header.stamp = rospy.Time.now()
             move_dir = numpy.array([
                     -self.objective.pose.position.x,
