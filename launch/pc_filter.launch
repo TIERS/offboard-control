@@ -20,6 +20,9 @@
       <param name="ugv_center_xy_topic" value="/ugv_center" />
       <param name="uav_big_tag_xy_topic" value="/uav_big_tag_xy" />
       <param name="uav_small_tag_xy_topic" value="/uav_small_tag_xy" />
+      <param name="uav_tag_center_xy_topic" value="/uav_tag_center_xy" />
+      <param name="uav_tag_range_topic" value="/uav_tag_dist" />
+      
 
       <node name="rs_pc_filter" pkg="offboard_control" type="pc_filter_node" output="screen"/>
    </group>

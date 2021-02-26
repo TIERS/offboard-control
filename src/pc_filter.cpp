@@ -8,6 +8,7 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/search/kdtree.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Range.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <pcl/io/pcd_io.h>
 #include <iostream>
@@ -34,12 +35,15 @@ std::string output_pc_topic;
 std::string ugv_center_xy_topic;
 std::string uav_big_tag_xy_topic;
 std::string uav_small_tag_xy_topic;
+std::string uav_tag_center_xy_topic;
+std::string uav_tag_range_topic;
 
 ros::Publisher filtered_pc_pub;
 ros::Publisher ugv_center_xy_pub;
 ros::Publisher uav_big_tag_xy_pub;
 ros::Publisher uav_small_tag_xy_pub;
-
+ros::Publisher uav_tag_center_xy_pub;
+ros::Publisher uav_tag_dist_pub;
 
 
 bool campare_condition (const pcl::PointIndices p_i, const pcl::PointIndices p_j) { return p_i.indices.size() > p_j.indices.size(); }
@@ -100,7 +104,8 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
   extract.setNegative(false);
   extract.filter(*cloud_green_xyz);
 
-  if(cloud_green_xyz->points.size() >0){
+  if(cloud_green_xyz->points.size() >0)
+  {
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree_search(new pcl::search::KdTree<pcl::PointXYZRGB>);
     tree_search->setInputCloud(cloud_green_xyz);
     std::vector<pcl::PointIndices> cluster_indices;
@@ -116,66 +121,79 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
     
     std::vector<int> big_cluster, small_cluster;
 
-    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_0(new pcl::PointCloud<pcl::PointXYZRGB>());
-    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_1(new pcl::PointCloud<pcl::PointXYZRGB>());
-  if(cluster_indices.size() >=1 )
-  {
-    double avg_small_x, avg_small_y, avg_big_x, avg_big_y;
-    // double avg_small_x = 99999.000;
-    // double avg_small_y = 99999.000;
-    // double avg_big_x = 99999.000;
-    // double avg_big_y = 99999.000;
-    std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
-    big_cluster = cluster_indices[0].indices;
-    double sum_big_x = 0.0;
-    double sum_big_y = 0.0;
-    for (std::vector<int>::const_iterator pit = big_cluster.begin(); pit != big_cluster.end(); ++pit)
+    if(cluster_indices.size() >=1 )
     {
-      // cloud_0->points.push_back(cloud_green_xyz->points[*pit]); 
-      sum_big_x += cloud_green_xyz->points[*pit].x;
-      sum_big_y += cloud_green_xyz->points[*pit].y;
-    }
-    avg_big_x = sum_big_x / big_cluster.size();
-    avg_big_y = sum_big_y / big_cluster.size();
-    ROS_INFO_STREAM("Big Tag: Points Size: " << big_cluster.size());
-    ROS_INFO_STREAM("Big Tag: Average x and y: " << avg_big_x << " , " << avg_big_y);
-
-    geometry_msgs::PoseStamped big_tag_msg;
-    big_tag_msg.header.stamp = ros::Time::now();
-    big_tag_msg.pose.position.x = avg_big_x;
-    big_tag_msg.pose.position.y = avg_big_y;
-    uav_big_tag_xy_pub.publish(big_tag_msg);
-
-    if(cluster_indices.size() > 1)
-    {
-      small_cluster = cluster_indices[1].indices;
-      double sum_small_x = 0.0;
-      double sum_small_y = 0.0;
-      for (std::vector<int>::const_iterator pit = small_cluster.begin(); pit != small_cluster.end(); ++pit)
+      bool flag = false;
+      double avg_small_x, avg_small_y, avg_big_x, avg_big_y;
+      std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
+      big_cluster = cluster_indices[0].indices;
+      double sum_big_x = 0.0;
+      double sum_big_y = 0.0;
+      for (std::vector<int>::const_iterator pit = big_cluster.begin(); pit != big_cluster.end(); ++pit)
       {
-        // cloud_1->points.push_back(cloud_green_xyz->points[*pit]); 
-        sum_small_x += cloud_green_xyz->points[*pit].x;
-        sum_small_y += cloud_green_xyz->points[*pit].y;
+        // cloud_0->points.push_back(cloud_green_xyz->points[*pit]); 
+        sum_big_x += cloud_green_xyz->points[*pit].x;
+        sum_big_y += cloud_green_xyz->points[*pit].y;
+      }
+      avg_big_x = sum_big_x / big_cluster.size();
+      avg_big_y = sum_big_y / big_cluster.size();
+      ROS_INFO_STREAM("Big Tag: Points Size: " << big_cluster.size());
+      ROS_INFO_STREAM("Big Tag: Average x and y: " << avg_big_x << " , " << avg_big_y);
+
+      if(cluster_indices.size() > 1)
+      {
+        small_cluster = cluster_indices[1].indices;
+        double sum_small_x = 0.0;
+        double sum_small_y = 0.0;
+        for (std::vector<int>::const_iterator pit = small_cluster.begin(); pit != small_cluster.end(); ++pit)
+        {
+          // cloud_1->points.push_back(cloud_green_xyz->points[*pit]); 
+          sum_small_x += cloud_green_xyz->points[*pit].x;
+          sum_small_y += cloud_green_xyz->points[*pit].y;
+        }
+
+        avg_small_x = sum_small_x / small_cluster.size();
+        avg_small_y = sum_small_y / small_cluster.size();
+
+        ROS_INFO_STREAM("Small Tag: Points Size: " << small_cluster.size());
+        ROS_INFO_STREAM("Small Tag: Average x and y: " << avg_small_x << " , " << avg_small_y);
+
+        flag = true;
       }
 
-      avg_small_x = sum_small_x / small_cluster.size();
-      avg_small_y = sum_small_y / small_cluster.size();
+      if(flag){
+        double dist = std::hypot(avg_big_x - avg_small_x, avg_big_y - avg_small_y);
+        if(dist>0.24 && dist < 0.26)
+        {
+          geometry_msgs::PoseStamped big_tag_msg;
+          big_tag_msg.header.stamp = ros::Time::now();
+          big_tag_msg.pose.position.x = avg_big_x;
+          big_tag_msg.pose.position.y = avg_big_y;
+          uav_big_tag_xy_pub.publish(big_tag_msg);
 
-      ROS_INFO_STREAM("Small Tag: Points Size: " << small_cluster.size());
-      ROS_INFO_STREAM("Small Tag: Average x and y: " << avg_small_x << " , " << avg_small_y);
+          geometry_msgs::PoseStamped small_tag_msg;
+          small_tag_msg.header.stamp = ros::Time::now();
+          small_tag_msg.pose.position.x = avg_small_x;
+          small_tag_msg.pose.position.y = avg_small_y;
+          uav_small_tag_xy_pub.publish(small_tag_msg);
 
-      geometry_msgs::PoseStamped small_tag_msg;
-      small_tag_msg.header.stamp = ros::Time::now();
-      small_tag_msg.pose.position.x = avg_small_x;
-      small_tag_msg.pose.position.y = avg_small_y;
-      uav_small_tag_xy_pub.publish(small_tag_msg);
-    }
+          geometry_msgs::PoseStamped tag_center_msg;
+          tag_center_msg.header.stamp = ros::Time::now();
+          tag_center_msg.pose.position.x = (avg_big_x + avg_small_x)/2.0;
+          tag_center_msg.pose.position.y = (avg_big_y + avg_small_y)/2.0;
+          uav_tag_center_xy_pub.publish(tag_center_msg);
+
+          sensor_msgs::Range range_msg;
+          range_msg.header.stamp = ros::Time::now();
+          range_msg.range = dist;
+          uav_tag_dist_pub.publish(range_msg);
+        }
+      }
     }
   }
   else{
     ROS_INFO_STREAM("No Green Tag In the UGV Center");
   }  
-
 
   sensor_msgs::PointCloud2 cloud_back_msg;
   cloud_back_msg.header.frame_id = cloud_green_xyz->header.frame_id;
@@ -211,6 +229,8 @@ int main(int argc, char **argv)
   n_.getParam("ugv_center_xy_topic", ugv_center_xy_topic);
   n_.getParam("uav_big_tag_xy_topic", uav_big_tag_xy_topic);
   n_.getParam("uav_small_tag_xy_topic", uav_small_tag_xy_topic);
+  n_.getParam("uav_tag_center_xy_topic", uav_tag_center_xy_topic);
+  n_.getParam("uav_tag_range_topic", uav_tag_range_topic);
 
   ROS_INFO_STREAM("Listening on this input pc topic: " << input_pc_topic);
   ROS_INFO_STREAM("Listening on this output pc topic: " << output_pc_topic);
@@ -232,9 +252,12 @@ int main(int argc, char **argv)
 
   uav_small_tag_xy_pub = n_.advertise<geometry_msgs::PoseStamped>(uav_small_tag_xy_topic, 1);
 
-  
+  uav_tag_center_xy_pub = n_.advertise<geometry_msgs::PoseStamped>(uav_tag_center_xy_topic, 1);
+
+  uav_tag_dist_pub = n_.advertise<sensor_msgs::Range>(uav_tag_range_topic, 1);
 
   ros::spin();
+
   return 0;
 }
 
