@@ -389,14 +389,17 @@ class LandingControl() :
                 self.going_back_home = True
 
             # Publish info
-            self.landing_done_pub.publish(
-                String(
-                    data = "Landing {} completed. Staying stationary {}/{} seconds".format(
-                        self.land_and_back_trip_count, 
-                        rospy.Time.now() - self.landing_done_time,
-                        self.min_landing_stationary_duration
-                    )
-                ))
+            if self.landing_done_time is not None :
+                self.landing_done_pub.publish(
+                    String(
+                        data = "Landing {} completed. Staying stationary {}/{} seconds".format(
+                            self.land_and_back_trip_count, 
+                            rospy.Time.now() - self.landing_done_time,
+                            self.min_landing_stationary_duration
+                        )
+                    ))
+            else :
+                rospy.loginfo("Landing done. Going back home.")
 
         else :
 
