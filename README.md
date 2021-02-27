@@ -1,4 +1,6 @@
-# Offboard control: PX4+MAVROS with UWB+VIO localization
+# Offboard control
+# PX4+MAVROS with UWB+VIO localization
+# and multi-robot collaboration
 
 Offboard controller for PX4 flight controllers with MAVROS. Uses UWB+VIO for localizartion in GNSS-denied environments.
 
