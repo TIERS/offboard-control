@@ -13,6 +13,9 @@ offboard_mode_topic:  "offboard/mode"
 dist_to_target_topic: "landing/distance"
 landing_done_topic:   "landing/completed"
 
+four_matrix_topic:    "/uwb/matrix/distances"
+single_range_topic:   "uwb/range"
+
 max_pos_delay:        0.6
 
 waypoint_step:        0.3
@@ -30,3 +33,8 @@ min_intermeas_dist:   0.2
 
 max_landing_trials :  2
 min_landing_stay:     2
+
+using_custom_uwb:     False
+num_of_custom_uwb:    4
+
+using_4x4_uwb:        False

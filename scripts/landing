@@ -108,7 +108,7 @@ class LandingControl() :
 
         # Publisher for actual control
         self.publishing_objective = False
-        self.waypoint_pub_topic = rospy.get_param('~waypoint_pub_topic', "/dwm1001/tag/dronie/position")
+        self.waypoint_pub_topic = rospy.get_param("~waypoint_pub_topic", "/dwm1001/tag/dronie/position")
         self.control_pub = rospy.Publisher(self.waypoint_pub_topic, PoseStamped, queue_size=10)
         
         # Keep track of offboard state
@@ -119,14 +119,13 @@ class LandingControl() :
         self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
 
         # Service for changing to external offboard mode
-        self.pub_state_mode = rospy.Publisher('/uav/offboard/mode/change', String, queue_size=10)
+        self.pub_state_mode = rospy.Publisher("/uav/offboard/mode/change", String, queue_size=10)
         self.set_ofboard_mode_client  = rospy.ServiceProxy("/uav/offboard/cmd/mode", OffMode)
 
         # 1D lidar (height)
-        self.lidar_topic = rospy.get_param('~lidar_topic', "/uav/tfmini_ros_node/range")
-        self.lidar_subscriber = rospy.Subscriber(self.lidar_topic, Range, self.lidar_cb)
-
         self.lidarz = 0.3
+        self.lidar_topic = rospy.get_param("~lidar_topic", "/uav/tfmini_ros_node/range")
+        self.lidar_subscriber = rospy.Subscriber(self.lidar_topic, Range, self.lidar_cb)
 
         # Ranging subscribers
         self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/tag_A/distance", Float64, self.custom_uwbA_cb)
@@ -134,10 +133,21 @@ class LandingControl() :
         self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/tag_C/distance", Float64, self.custom_uwbC_cb)
         self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/tag_D/distance", Float64, self.custom_uwbD_cb)
 
+        # Single ranging subscriber
+        self.single_uwb_range = -1
+        self.single_range_topic = rospy.get_param("~single_uwb_range_topic", "/uwb/range")
+        self.uwb_single_range_sub = rospy.Subscriber(self.single_range_topic, Float64, self.single_uwb_range_cb)
+
+        # Four-by-four matrix ranging
+        self.ranging_matrix = None
+        self.ranging_matrix_topic = rospy.get_param("~four_matrix_topic", "/uwb/matrix/distances")
+        self.ranging_matrix_sub = rospy.Subscriber(self.ranging_matrix_topic, String, self.ranging_matrix_cb)
+
+        # Custom one-to-four UWB ranging
         self.custom_uwb_ranges = numpy.ones(4)
         self.custom_uwb_stamps = [rospy.Time()] * 4
-        self.num_uwb_in_use = 4
-        self.using_custom_uwb = False    # Do not use Decawave's DRTLS
+        self.using_custom_uwb = rospy.get_param("using_custom_uwb", False)    # Do not use Decawave's DRTLS
+        self.num_uwb_in_use = rospy.get_param("num_of_custom_uwb", 4)
         self.min_uwb_ranges = False     # At least 2 transceivers should be active...
 
         self.ugv_x0 = 0.6
@@ -192,6 +202,19 @@ class LandingControl() :
             Update UAV VIO odom (callback)
         '''
         self.uav_vio_pos = odom
+
+    def single_uwb_range_cb(self, range) :
+        '''
+            Update single UGV-UAV UWB ranging measurement
+        '''
+        self.single_uwb_range = range
+
+    def ranging_matrix_cb(self, matrix) :
+        '''
+            Update 4by4 ranging matrix
+            TODO extract data to actual matrix
+        '''
+        self.ranging_matrix = matrix.data
 
     def custom_uwbA_cb(self, range) :
         '''
