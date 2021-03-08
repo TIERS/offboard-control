@@ -1,0 +1,2 @@
+KERNEL=="ttyACM*", ATTRS{idVendor}=="26ac", ATTRS{idProduct}=="0032", MODE:="0666", SYMLINK+="pixhawk"
+KERNEL=="ttyACM*", ATTRS{idVendor}=="1366", ATTRS{idProduct}=="0105", MODE:="0666", SYMLINK+="uwb"
