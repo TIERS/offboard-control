@@ -1,0 +1,5 @@
+<launch> 
+    <include file="$(find mavros)/launch/px4.launch">
+        <arg name="fcu_url" default="/dev/pixhawk:57600" />
+    </include>
+</launch>

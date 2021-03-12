@@ -1,4 +1,6 @@
-# Offboard control: PX4+MAVROS with UWB+VIO localization
+# Offboard control
+# PX4+MAVROS with UWB+VIO localization
+# and multi-robot collaboration
 
 Offboard controller for PX4 flight controllers with MAVROS. Uses UWB+VIO for localizartion in GNSS-denied environments.
 
@@ -72,8 +74,9 @@ which will automatically detect the camera and output the corresponding serial n
 
 
 
-## pc_filter node
-This node to filter a point cloud via a pass through filter and catch the center of our UGV through the green color in the center of you robot using realsense L515.
+## PC_Filter node
+
+This node to filter a point cloud via a pass through filter and catch the center of our UGV through the green color in the center of you robot using a Realsense L515 lidar camera.
 
 
 
@@ -88,11 +91,12 @@ This node to filter a point cloud via a pass through filter and catch the center
 - `filtered_frame_id`: This is the frame of reference that the filtered point cloud will be rebroadcast in
 - `input_pc_topic`: This is the ROS topic the unfiltered point cloud is being published on.
 - `output_pc_topic`: This is the ROS topic in which the filtered point cloud will be published.
-- ugv_center_xy_topic: This a the ROS topic in which the center of the UGV will be published.
+- `ugv_center_xy_topic`: This a the ROS topic in which the center of the UGV will be published.
 
 ### Usage
 Place the following in a launch file:
 ```
+<launch>
    <group ns="pc_filter">
       <param name="xpassthrough/filter_limit_min" value="-0.5" />
       <param name="ypassthrough/filter_limit_min" value="-0.5" />
@@ -115,6 +119,6 @@ Place the following in a launch file:
 
 ## Contact
 
-For any questions, write to `jopequ@utu.fi`.
+For any questions, write to `jopequ@utu.fi`, `qingqli@utu.fi`, or `xianjia.yu@utu.fi`.
 
 Visit us at [https://tiers.utu.fi](https://tiers.utu.fi)
