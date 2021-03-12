@@ -34,6 +34,11 @@ min_intermeas_dist:   0.2
 max_landing_trials :  2
 min_landing_stay:     2
 
+custom_uwb_xsep:      0.58
+custom_uwb_ysep:      0.58
+custom_uwb_xoffset:   0.29
+custom_uwb_yoffset:   0.29
+
 using_custom_uwb:     False
 num_of_custom_uwb:    4
 

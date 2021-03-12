@@ -102,7 +102,6 @@ class LandingControl() :
         self.accumulated_meas = []
         self.relative_pos_estimation_done = False
 
-
     def update_current_pos_cb(self, pos) :
         '''
             Update position from mavros local pose (callback)
