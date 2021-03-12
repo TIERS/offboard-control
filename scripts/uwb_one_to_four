@@ -96,8 +96,6 @@ class dwm1001_localizer:
         if(len(arrayData) is not 5): 
             return
 
-        # print(arrayData)
-
         node_id = arrayData[1]
         first_time = False
         if node_id not in self.topics :

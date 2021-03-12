@@ -113,7 +113,7 @@ class LandingControl() :
         
         # Keep track of offboard state
         self.offboard_state = String()
-        self.offboard_state_topic = rospy.get_param("offboard_state_topic", "offboard/state")
+        self.offboard_state_topic = rospy.get_param("~offboard_state_topic", "offboard/state")
         rospy.loginfo("Subscribing to offboard state at {}".format(self.offboard_state_topic))
 
         self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
@@ -146,14 +146,14 @@ class LandingControl() :
         # Custom one-to-four UWB ranging
         self.custom_uwb_ranges = numpy.ones(4)
         self.custom_uwb_stamps = [rospy.Time()] * 4
-        self.using_custom_uwb = rospy.get_param("using_custom_uwb", False)    # Do not use Decawave's DRTLS
-        self.num_uwb_in_use = rospy.get_param("num_of_custom_uwb", 4)
+        self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
+        self.num_uwb_in_use = rospy.get_param("~num_of_custom_uwb", 4)
         self.min_uwb_ranges = False     # At least 2 transceivers should be active...
 
-        self.ugv_x0 = rospy.get_param("custom_uwb_xsep", 0.6)
-        self.ugv_y0 = rospy.get_param("custom_uwb_ysep", 0.6)
-        self.ugv_xoffset = rospy.get_param("custom_uwb_xoffset", 0.3)
-        self.ugv_yoffset = rospy.get_param("custom_uwb_yoffset", 0.3)
+        self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.6)
+        self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
+        self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
+        self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
         
         # UWB pairs to calculate relative pos and average
         # 3rd element means x is calculated with cos (+1) or sin (-1)
@@ -221,7 +221,7 @@ class LandingControl() :
         '''
             Update range to custom UWB A
         '''
-        self.custom_uwb_ranges[0] = range.data - 0.3
+        self.custom_uwb_ranges[0] = range.data - 0.27
         if self.custom_uwb_ranges[0] < 0 :
             self.custom_uwb_ranges[0] = 0
         self.custom_uwb_stamps[0] = rospy.Time.now()
@@ -230,7 +230,7 @@ class LandingControl() :
         '''
             Update range to custom UWB B
         '''
-        self.custom_uwb_ranges[1] = range.data - 0.3
+        self.custom_uwb_ranges[1] = range.data - 0.27
         if self.custom_uwb_ranges[1] < 0 :
             self.custom_uwb_ranges[1] = 0
         self.custom_uwb_stamps[1] = rospy.Time.now()
@@ -239,7 +239,7 @@ class LandingControl() :
         '''
             Update range to custom UWB C
         '''
-        self.custom_uwb_ranges[2] = range.data - 0.3
+        self.custom_uwb_ranges[2] = range.data - 0.27
         if self.custom_uwb_ranges[2] < 0 :
             self.custom_uwb_ranges[2] = 0
         self.custom_uwb_stamps[2] = rospy.Time.now()
@@ -248,7 +248,7 @@ class LandingControl() :
         '''
             Update range to custom UWB D
         '''
-        self.custom_uwb_ranges[3] = range.data - 0.3
+        self.custom_uwb_ranges[3] = range.data - 0.27
         if self.custom_uwb_ranges[3] < 0 :
             self.custom_uwb_ranges[3] = 0
         self.custom_uwb_stamps[3] = rospy.Time.now()
@@ -264,11 +264,11 @@ class LandingControl() :
             Checks at least two (usable) ranges are available
         '''
         cnt = 0
-        diffs = [rospy.Time.now() - stamp - rospy.Duration(self.max_pos_delay) for stamp in self.custom_uwb_stamps]
+        diffs = [rospy.Time.now() - stamp for stamp in self.custom_uwb_stamps]
         for pair in self.uwb_pairs :
-            if diffs[pair[0]] < rospy.Duration(0) and diffs[pair[1]] < rospy.Duration(0) :
+            if diffs[pair[0]] < rospy.Duration(self.max_pos_delay) and diffs[pair[1]] < rospy.Duration(self.max_pos_delay) :
                 cnt += 1
-        if cnt > 1 :
+        if cnt > 0 :
             self.min_uwb_ranges = True
         else :
             self.min_uwb_ranges = False
@@ -277,12 +277,12 @@ class LandingControl() :
         '''
             Calculates where the drone locate of the tage, top-right, top-left, bottom-right, bottom-left
         '''
-        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[1] and custom_uwb_ranges[1] > abs(self.ugv_y0))  \
-           or (self.custom_uwb_ranges[3] >= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_y0)): 
-            y = 1
-        else:
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[1] and self.custom_uwb_ranges[1] > abs(self.ugv_y0))  \
+           or (self.custom_uwb_ranges[3] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_y0)): 
             y = -1
-        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[3] and custom_uwb_ranges[3] > abs(self.ugv_x0))  \
+        else:
+            y = 1
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[3] and self.custom_uwb_ranges[3] > abs(self.ugv_x0))  \
            or (self.custom_uwb_ranges[1] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_x0)): 
             x = -1
         else:
@@ -293,7 +293,8 @@ class LandingControl() :
         '''
             Calculates relative UGV-UAV position based on 2-4 transceivers on the UGV
         '''
-        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin(self.pos.pose.position.z / self.custom_uwb_ranges) )
+
+        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.07) / self.custom_uwb_ranges) )
 
         est_cnt = 0 # Count how many pairs of transceivers we use to average estimation
         est_x = 0
@@ -303,13 +304,21 @@ class LandingControl() :
         # 3rd element means x is calculated with cos (+1) or sin (-1)
         # 4th, 5th elements have to be added to x,y respectively (offsets)
         # 6th element is the third side of the triangle to estimate angle
+
+        (locx, locy) = self.calculate_drone_locate_area()
+
         diffs = [rospy.Time.now() - stamp - rospy.Duration(self.max_pos_delay) for stamp in self.custom_uwb_stamps]
         for pair in self.uwb_pairs :
             if diffs[pair[0]] < rospy.Duration(0) and diffs[pair[1]] < rospy.Duration(0) :
                 est_arg = ( ground_distances[pair[0]]**2 + pair[5]**2 - ground_distances[pair[1]] **2 ) / (2 * ground_distances[pair[0]] * pair[5] )
                 if est_arg > -1 and est_arg < 1 :
                     est_theta = math.acos( est_arg )
-                    print("Pair {} -- {}  =========> Theta = {}".format(pair[0], pair[1], est_theta))
+                    if pair[2] > 0 :
+                        est_theta *= locy
+                    else :
+                        est_theta *= locx
+                    # rospy.loginfo("Pair {} -- {}  =========> Theta = {}".format(pair[0], pair[1], est_theta))
+                    # sys.stdout.write("Pair {} -- {}  =========> Theta = {}\n".format(pair[0], pair[1], est_theta))
                     if pair[2] > 0 :
                         est_x += ground_distances[pair[0]] * math.cos(est_theta) + pair[3]
                         est_y += ground_distances[pair[0]] * math.sin(est_theta) + pair[4]
@@ -317,10 +326,11 @@ class LandingControl() :
                         est_x += ground_distances[pair[0]] * math.sin(est_theta) + pair[3]
                         est_y += ground_distances[pair[0]] * math.cos(est_theta) + pair[4]
                     est_cnt += 1
-        
         if est_cnt > 0 :
             est_relative_pos = numpy.array([est_x, est_y]) / est_cnt
-            print("Relative position estimate: ({})".format(est_relative_pos))
+            # rospy.loginfo("Relative position estimate: ({})".format(est_relative_pos))
+            sys.stdout.write("\rRelative position estimate: ({})   ---   {}   ---   {}".format(est_relative_pos, self.custom_uwb_ranges, (locx, locy)))
+            sys.stdout.flush()
 
             # "Fake" UGV pos (compared to DRTLS UWB)
             self.ugv_uwb_pos = PoseStamped()
@@ -335,6 +345,9 @@ class LandingControl() :
             self.uav_uwb_pos.pose.position.x = est_relative_pos[0]
             self.uav_uwb_pos.pose.position.y = est_relative_pos[1]
             self.uav_uwb_pos.pose.position.z = self.pos.pose.position.z
+
+            self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
+            self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
 
         else :
             rospy.logerr("Could not triangulate with any pair of UGV transceivers.")
@@ -436,6 +449,8 @@ class LandingControl() :
                 self.check_min_uwb_ranges()
                 if self.min_uwb_ranges :
                     self.calculate_relative_uwb_poses()
+                else :
+                    rospy.logwarn("Not enough UWB ranges have been locked...")
 
             if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
                 self.publishing_objective = False
@@ -476,11 +491,11 @@ class LandingControl() :
 
                 if self.dist_to_target < self.landing_stop_dist :
                     self.landing_cnt += 1
-                    if self.landing_cnt > 5 :
-                        self.landing_done = True
-                        self.pose_when_landing = self.pos
-                        self.pose_when_landing.pose.position.z = self.landing_altitude
-                        # print(self.pose_when_landing)
+                    print("\n\n ### Landing done {} from {} to {}, dist is {}.\n".format(self.landing_cnt, uav_pos, ugv_pos, self.dist_to_target))
+                    # if self.landing_cnt > 5 :
+                    #     self.landing_done = True
+                    #     self.pose_when_landing = self.pos
+                    #     self.pose_when_landing.pose.position.z = self.landing_altitude
                 
                 self.objective = self.pos
                 self.objective.header.stamp = rospy.Time.now()
@@ -535,7 +550,7 @@ class LandingControl() :
             self.pub_state_mode.publish(mode)
             self.set_ofboard_mode_client("external_control")
         except rospy.ServiceException as e:
-            print("Service failed: {}. Offboard mode cannot be changed to external control.".format(e))
+            rospy.logwarn("Service failed: {}. Offboard mode cannot be changed to external control.".format(e))
 
         # Start flying towards target and check when we should land
         rospy.loginfo("Everything in order. Let's fly.")
