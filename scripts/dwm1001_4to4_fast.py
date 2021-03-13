@@ -31,7 +31,7 @@ class dwm1001_localizer:
         rospy.init_node('DWM1001_Active_{}'.format(random.randint(0,100000)), anonymous=False)
 
         # Get port and tag name
-        self.dwm_port = rospy.get_param('~port', '/dev/ttyACM0')
+        self.dwm_port = rospy.get_param('~port', '/dev/uwb')
         self.tag_name = rospy.get_param('~tag_name', 'my_node')
         self.network = rospy.get_param('~network', "default")
         self.verbose = rospy.get_param('~verbose', False)

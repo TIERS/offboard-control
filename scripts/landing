@@ -135,6 +135,11 @@ class LandingControl() :
         self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/tag_C/distance", Float64, self.custom_uwbC_cb)
         self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/tag_D/distance", Float64, self.custom_uwbD_cb)
 
+        self.custom_uwb_rangeA_sub = rospy.Subscriber("/uwb/distance/from/A/to/B", Float64, self.custom_uwbA_cb)
+        self.custom_uwb_rangeB_sub = rospy.Subscriber("/uwb/distance/from/A/to/C", Float64, self.custom_uwbB_cb)
+        self.custom_uwb_rangeC_sub = rospy.Subscriber("/uwb/distance/from/A/to/D", Float64, self.custom_uwbC_cb)
+        # self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/tag_D/distance", Float64, self.custom_uwbD_cb)
+
         # Single ranging subscriber
         self.single_uwb_range = -1
         self.single_range_topic = rospy.get_param("~single_uwb_range_topic", "/uwb/range")
@@ -297,21 +302,22 @@ class LandingControl() :
             Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
             Uses least squares optimization.
         '''
-        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.2) / self.custom_uwb_ranges) )
-        '''
+        ground_distances = self.custom_uwb_ranges[:3] * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.35) / self.custom_uwb_ranges[:3]) )
+        
         if not self.uav_uwb_pos.header.stamp :
-            uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
-            # uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges)
+            # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges)
             rospy.logwarn("Cannot use previous UAV relative pos for LE search.")
         else :
-            xlim = [self.uav_uwb_pos.pose.position.x - 0.4, self.uav_uwb_pos.pose.position.x + 0.4]
-            ylim = [self.uav_uwb_pos.pose.position.y - 0.4, self.uav_uwb_pos.pose.position.y + 0.4]
-            uav_pos, uav_err = relative_position_from_four_meas(ground_distances)#, xlim, ylim)
-            # uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges, xlim, ylim)
-        '''
-        xlim = [self.uav_uwb_pos.pose.position.x - 0.4, self.uav_uwb_pos.pose.position.x + 0.4]
-        ylim = [self.uav_uwb_pos.pose.position.y - 0.4, self.uav_uwb_pos.pose.position.y + 0.4]
-        uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
+            xlim = [self.uav_uwb_pos.pose.position.x - 0.3, self.uav_uwb_pos.pose.position.x + 0.3]
+            ylim = [self.uav_uwb_pos.pose.position.y - 0.3, self.uav_uwb_pos.pose.position.y + 0.3]
+            # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)#, xlim, ylim)
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges, xlim, ylim)
+        
+        # xlim = [self.uav_uwb_pos.pose.position.x - 0.4, self.uav_uwb_pos.pose.position.x + 0.4]
+        # ylim = [self.uav_uwb_pos.pose.position.y - 0.4, self.uav_uwb_pos.pose.position.y + 0.4]
+        # uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3])
+        # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
         
         # Done estimating relative position
         rospy.loginfo("\rRelative position estimate: ({}) with error {} and distances {}".format(uav_pos, uav_err, self.custom_uwb_ranges))
@@ -541,7 +547,7 @@ class LandingControl() :
 
                 if self.dist_to_target < self.landing_stop_dist :
                     self.landing_cnt += 1
-                    print("\n\n ### Landing done {} from {} to {}, dist is {}.\n".format(self.landing_cnt, uav_pos, ugv_pos, self.dist_to_target))
+                    rospy.loginfo("\n\n ### Landing done {} from {} to {}, dist is {}.\n".format(self.landing_cnt, uav_pos, ugv_pos, self.dist_to_target))
                     if self.landing_cnt > 1 :
                         self.landing_done = True
                         self.pose_when_landing = self.pos
@@ -551,6 +557,9 @@ class LandingControl() :
                 self.objective.header.stamp = rospy.Time.now()
                 self.objective.pose.position.x += move_dir[0]
                 self.objective.pose.position.y += move_dir[1]
+
+                # sys.stdout.write("\rMove dir: ({})".format(move_dir))
+                # sys.stdout.flush()
 
                 if self.dist_to_target > self.closing_dist :
                     self.objective.pose.position.z = self.approaching_altitude
