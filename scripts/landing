@@ -15,7 +15,7 @@ from geometry_msgs.msg  import PoseStamped
 
 from offboard_control.srv  import flight_mode as OffMode
 
-from .utils import relative_position_from_four_meas
+from utils import relative_position_from_four_meas
 
 class LandingControl() :
 
@@ -297,17 +297,26 @@ class LandingControl() :
             Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
             Uses least squares optimization.
         '''
-        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.07) / self.custom_uwb_ranges) )
+        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.2) / self.custom_uwb_ranges) )
+        '''
         if not self.uav_uwb_pos.header.stamp :
-            uav_pos = relative_position_from_four_meas(ground_distances)
+            uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
+            # uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges)
+            rospy.logwarn("Cannot use previous UAV relative pos for LE search.")
         else :
-            xlim = [self.uav_uwb_pos.pose.position.x - 0.5, self.uav_uwb_pos.pose.position.x + 0.5]
-            ylim = [self.uav_uwb_pos.pose.position.y - 0.5, self.uav_uwb_pos.pose.position.y + 0.5]
-            uav_pos = relative_position_from_four_meas(ground_distances, xlim, ylim)
+            xlim = [self.uav_uwb_pos.pose.position.x - 0.4, self.uav_uwb_pos.pose.position.x + 0.4]
+            ylim = [self.uav_uwb_pos.pose.position.y - 0.4, self.uav_uwb_pos.pose.position.y + 0.4]
+            uav_pos, uav_err = relative_position_from_four_meas(ground_distances)#, xlim, ylim)
+            # uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges, xlim, ylim)
+        '''
+        xlim = [self.uav_uwb_pos.pose.position.x - 0.4, self.uav_uwb_pos.pose.position.x + 0.4]
+        ylim = [self.uav_uwb_pos.pose.position.y - 0.4, self.uav_uwb_pos.pose.position.y + 0.4]
+        uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
         
         # Done estimating relative position
-        sys.stdout.write("\rRelative position estimate: ({})   ---   {}   ---   {}".format(uav_pos, self.custom_uwb_ranges, (locx, locy)))
-        sys.stdout.flush()
+        rospy.loginfo("\rRelative position estimate: ({}) with error {} and distances {}".format(uav_pos, uav_err, self.custom_uwb_ranges))
+        # sys.stdout.write("\rRelative position estimate: ({})   with error   {}".format(uav_pos, uav_err))
+        # sys.stdout.flush()
 
         # "Fake" UGV pos (compared to DRTLS UWB)
         self.ugv_uwb_pos = PoseStamped()
@@ -514,18 +523,21 @@ class LandingControl() :
                 if self.dist_to_target > self.landing_dist :
                     move_dir = self.waypoint_step * move_dir / self.dist_to_target
                 else :
-                    ugv_poses = numpy.array([[
-                        pos.pose.position.x,
-                        pos.pose.position.y
-                    ] for pos in self.ugv_uwb_pos_acc])
-                    uav_poses = numpy.array([[
-                        pos.pose.position.x,
-                        pos.pose.position.y
-                    ] for pos in self.uav_uwb_pos_acc])
-                    ugv_pos = ugv_poses.mean(axis=0)
-                    uav_pos = uav_poses.mean(axis=0)
-                    move_dir = ugv_pos - uav_pos
-                    self.dist_to_target = numpy.linalg.norm(move_dir)
+                    if self.using_custom_uwb :
+                        move_dir = 0.4 * self.waypoint_step * move_dir / self.dist_to_target
+                    else : 
+                        ugv_poses = numpy.array([[
+                            pos.pose.position.x,
+                            pos.pose.position.y
+                        ] for pos in self.ugv_uwb_pos_acc])
+                        uav_poses = numpy.array([[
+                            pos.pose.position.x,
+                            pos.pose.position.y
+                        ] for pos in self.uav_uwb_pos_acc])
+                        ugv_pos = ugv_poses.mean(axis=0)
+                        uav_pos = uav_poses.mean(axis=0)
+                        move_dir = ugv_pos - uav_pos
+                        self.dist_to_target = numpy.linalg.norm(move_dir)
 
                 if self.dist_to_target < self.landing_stop_dist :
                     self.landing_cnt += 1

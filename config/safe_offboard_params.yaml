@@ -18,4 +18,4 @@ takeoff_height: 1.0
 circle_radius: 0.6
 pos_valid_time: 1.0
 waypoint_valid_time: 1.0
-fly_fence: [-1.5, -1.8, 0.0, 1.5, 1.5, 1.5]
+fly_fence: [-2.1, -1, 0.0, 1.5, 2.5, 1.8]

@@ -2,7 +2,7 @@
 
     <node name="UWB_VIO_Landing" pkg="offboard_control" type="landing" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/landing_params.yaml" command="load"/>
-        <!-- <param name="using_custom_uwb" value="True" /> -->
+        <param name="using_custom_uwb" value="True" />
     </node>
 
     <node name="DWM1001_Relative" pkg="offboard_control" type="uwb_one_to_four" respawn="true" output="screen">
