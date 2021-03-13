@@ -16,13 +16,13 @@ landing_done_topic:   "landing/completed"
 four_matrix_topic:    "/uwb/matrix/distances"
 single_range_topic:   "uwb/range"
 
-max_pos_delay:        0.6
+max_pos_delay:        1.2
 
 waypoint_step:        0.3
 
 approaching_altitude: 1.4
-closing_altitude:     0.8
-landing_altitude:     1.2
+closing_altitude:     1.2
+landing_altitude:     1
 
 closing_dist:         1.5
 landing_dist:         0.8
@@ -31,7 +31,7 @@ landing_stop_dist:    0.04
 min_accumulated_meas: 20
 min_intermeas_dist:   0.2
 
-max_landing_trials :  2
+max_landing_trials :  12
 min_landing_stay:     2
 
 custom_uwb_xsep:      0.58
