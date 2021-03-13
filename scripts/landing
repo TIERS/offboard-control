@@ -530,10 +530,10 @@ class LandingControl() :
                 if self.dist_to_target < self.landing_stop_dist :
                     self.landing_cnt += 1
                     print("\n\n ### Landing done {} from {} to {}, dist is {}.\n".format(self.landing_cnt, uav_pos, ugv_pos, self.dist_to_target))
-                    # if self.landing_cnt > 5 :
-                    #     self.landing_done = True
-                    #     self.pose_when_landing = self.pos
-                    #     self.pose_when_landing.pose.position.z = self.landing_altitude
+                    if self.landing_cnt > 1 :
+                        self.landing_done = True
+                        self.pose_when_landing = self.pos
+                        self.pose_when_landing.pose.position.z = self.landing_altitude
                 
                 self.objective = self.pos
                 self.objective.header.stamp = rospy.Time.now()
