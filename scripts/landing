@@ -15,6 +15,8 @@ from geometry_msgs.msg  import PoseStamped
 
 from offboard_control.srv  import flight_mode as OffMode
 
+from .utils import relative_position_from_four_meas
+
 class LandingControl() :
 
     def __init__(self) :
@@ -288,7 +290,42 @@ class LandingControl() :
         else:
             x = 1
         return (x, y)
+    
+    def calculate_relative_pos_least_squares(self) :
+        '''
+            Calculates relative UGV-UAV positions.
+            Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
+            Uses least squares optimization.
+        '''
+        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.07) / self.custom_uwb_ranges) )
+        if not self.uav_uwb_pos.header.stamp :
+            uav_pos = relative_position_from_four_meas(ground_distances)
+        else :
+            xlim = [self.uav_uwb_pos.pose.position.x - 0.5, self.uav_uwb_pos.pose.position.x + 0.5]
+            ylim = [self.uav_uwb_pos.pose.position.y - 0.5, self.uav_uwb_pos.pose.position.y + 0.5]
+            uav_pos = relative_position_from_four_meas(ground_distances, xlim, ylim)
         
+        # Done estimating relative position
+        sys.stdout.write("\rRelative position estimate: ({})   ---   {}   ---   {}".format(uav_pos, self.custom_uwb_ranges, (locx, locy)))
+        sys.stdout.flush()
+
+        # "Fake" UGV pos (compared to DRTLS UWB)
+        self.ugv_uwb_pos = PoseStamped()
+        self.ugv_uwb_pos.header.stamp = rospy.Time.now()
+        self.ugv_uwb_pos.pose.position.x = self.ugv_xoffset
+        self.ugv_uwb_pos.pose.position.y = self.ugv_yoffset
+        self.ugv_uwb_pos.pose.position.z = 0
+
+        # "Fake" UAV pos (compared to DRTLS UWB)
+        self.uav_uwb_pos = PoseStamped()
+        self.uav_uwb_pos.header.stamp = rospy.Time.now()
+        self.uav_uwb_pos.pose.position.x = uav_pos[0]
+        self.uav_uwb_pos.pose.position.y = uav_pos[1]
+        self.uav_uwb_pos.pose.position.z = self.pos.pose.position.z
+
+        self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
+        self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
+
     def calculate_relative_uwb_poses(self) :
         '''
             Calculates relative UGV-UAV position based on 2-4 transceivers on the UGV
@@ -448,7 +485,8 @@ class LandingControl() :
                 # Check at least two ranges are available
                 self.check_min_uwb_ranges()
                 if self.min_uwb_ranges :
-                    self.calculate_relative_uwb_poses()
+                    # self.calculate_relative_uwb_poses()
+                    self.calculate_relative_pos_least_squares()
                 else :
                     rospy.logwarn("Not enough UWB ranges have been locked...")
 
