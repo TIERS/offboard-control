@@ -1,7 +1,7 @@
 uav_uwb_topic:        "/dwm1001/tag/dronie/position"
 ugv_uwb_topic:        "/dwm1001/tag/ugv/position"
 
-ugv_vio_topic:        "/ugv/t265/odom/sample"
+ugv_vio_topic:        "/ugv/t265/odom/sample_throttled"
 uav_vio_topic:        "/uav/t265/odom/sample"
 
 local_pos_topic:      "mavros/local_position/pose"
@@ -20,9 +20,9 @@ max_pos_delay:        1.2
 
 waypoint_step:        0.3
 
-approaching_altitude: 1.4
-closing_altitude:     1.2
-landing_altitude:     1
+approaching_altitude: 1.7
+closing_altitude:     1.5
+landing_altitude:     1.3
 
 closing_dist:         1.5
 landing_dist:         0.8
@@ -31,8 +31,9 @@ landing_stop_dist:    0.04
 min_accumulated_meas: 20
 min_intermeas_dist:   0.2
 
-max_landing_trials :  12
-min_landing_stay:     2
+max_landing_trials :  1
+min_landing_stay:     8
+min_home_stay:        1
 
 custom_uwb_xsep:      0.58
 custom_uwb_ysep:      0.58
@@ -43,3 +44,4 @@ using_custom_uwb:     False
 num_of_custom_uwb:    4
 
 using_4x4_uwb:        False
+land_while_ugv_moves: True

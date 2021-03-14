@@ -4,6 +4,7 @@ import os
 import sys
 import math
 import time
+import copy
 import rospy
 import numpy
 
@@ -50,8 +51,10 @@ class LandingControl() :
         self.dist_to_home = -1
         self.arrived_home_time = None
         self.land_and_back_trip_count = 1
+        self.mission_completed = False
         self.max_landing_trials = rospy.get_param("~max_landing_trials", 2)
         self.min_landing_stationary_duration = rospy.get_param("~min_landing_stay", 2.0)
+        self.min_home_stationary_duration = rospy.get_param("~min_home_stay", 2.0)
 
         # Control altitudes
         self.approaching_altitude = rospy.get_param("~approaching_altitude", 1.2)
@@ -156,6 +159,8 @@ class LandingControl() :
         self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
         self.num_uwb_in_use = rospy.get_param("~num_of_custom_uwb", 4)
         self.min_uwb_ranges = False     # At least 2 transceivers should be active...
+        self.land_while_ugv_is_moving = True#rospy.get_param("~land_while_ugv_moves", False)
+        self.ugv_vio_pos_when_landed = None
 
         self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.6)
         self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
@@ -306,13 +311,13 @@ class LandingControl() :
         
         if not self.uav_uwb_pos.header.stamp :
             # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
-            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges)
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3])
             rospy.logwarn("Cannot use previous UAV relative pos for LE search.")
         else :
             xlim = [self.uav_uwb_pos.pose.position.x - 0.3, self.uav_uwb_pos.pose.position.x + 0.3]
             ylim = [self.uav_uwb_pos.pose.position.y - 0.3, self.uav_uwb_pos.pose.position.y + 0.3]
             # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)#, xlim, ylim)
-            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges, xlim, ylim)
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3], xlim, ylim)
         
         # xlim = [self.uav_uwb_pos.pose.position.x - 0.4, self.uav_uwb_pos.pose.position.x + 0.4]
         # ylim = [self.uav_uwb_pos.pose.position.y - 0.4, self.uav_uwb_pos.pose.position.y + 0.4]
@@ -438,10 +443,12 @@ class LandingControl() :
             if self.dist_to_home < 0.3 and self.dist_to_home >= 0 :
                 if self.arrived_home_time is None :
                     self.arrived_home_time = rospy.Time.now()
-                elif rospy.Time.now() - self.arrived_home_time > rospy.Duration(self.min_landing_stationary_duration) :
-                    self.land_and_back_trip_count += 1
+                elif rospy.Time.now() - self.arrived_home_time > rospy.Duration(self.min_home_stationary_duration) :
+                    if not self.mission_completed :
+                        self.land_and_back_trip_count += 1
                     if self.land_and_back_trip_count > self.max_landing_trials : 
                         self.objective.pose.position.z = 0
+                        self.mission_completed = True
                     else :
                         self.going_back_home = False
                         self.arrived_home_time = None
@@ -468,7 +475,23 @@ class LandingControl() :
         elif self.landing_done :
 
             # Stay stationary
-            self.objective = self.pose_when_landing
+            self.objective = copy.deepcopy(self.pose_when_landing)
+            if self.land_while_ugv_is_moving :
+                ugv_delta_pos = [0,0]
+                ugv_delta_pos[0] = self.ugv_vio_pos_when_landed.pose.pose.position.y - self.ugv_vio_pos.pose.pose.position.y
+                ugv_delta_pos[1] = self.ugv_vio_pos_when_landed.pose.pose.position.x - self.ugv_vio_pos.pose.pose.position.x
+                self.objective.pose.position.x = self.pose_when_landing.pose.position.x + ugv_delta_pos[0]
+                rospy.loginfo("Pose when landing was {}".format(self.pose_when_landing))
+                self.objective.pose.position.y = self.pose_when_landing.pose.position.y + ugv_delta_pos[1]
+                rospy.loginfo("Staying stationary on top of UGV. UGV vio is [{},{}], VIO when landed was [{},{}]. Objective is [{}, {}]".format(
+                    self.ugv_vio_pos.pose.pose.position.x,
+                    self.ugv_vio_pos.pose.pose.position.y,
+                    self.ugv_vio_pos_when_landed.pose.pose.position.x,
+                    self.ugv_vio_pos_when_landed.pose.pose.position.y,
+                    self.objective.pose.position.x,
+                    self.objective.pose.position.y
+                ))
+                rospy.loginfo("Delta poses are {}".format(ugv_delta_pos))
             self.objective.header.stamp = rospy.Time.now()
             self.control_pub.publish(self.objective)
 
@@ -530,7 +553,7 @@ class LandingControl() :
                     move_dir = self.waypoint_step * move_dir / self.dist_to_target
                 else :
                     if self.using_custom_uwb :
-                        move_dir = 0.4 * self.waypoint_step * move_dir / self.dist_to_target
+                        move_dir = self.waypoint_step * move_dir / self.dist_to_target
                     else : 
                         ugv_poses = numpy.array([[
                             pos.pose.position.x,
@@ -548,10 +571,29 @@ class LandingControl() :
                 if self.dist_to_target < self.landing_stop_dist :
                     self.landing_cnt += 1
                     rospy.loginfo("\n\n ### Landing done {} from {} to {}, dist is {}.\n".format(self.landing_cnt, uav_pos, ugv_pos, self.dist_to_target))
-                    if self.landing_cnt > 1 :
+                    if self.landing_cnt > 1 and not self.landing_done :
                         self.landing_done = True
-                        self.pose_when_landing = self.pos
+                        self.pose_when_landing = copy.deepcopy(self.pos)
+                        # self.pose_when_landing = PoseStamped()
+                        # self.pose_when_landing.pose.position.x = float(self.pos.pose.position.x)
+                        # self.pose_when_landing.pose.position.y = float(self.pos.pose.position.y)
+                        # self.pose_when_landing.pose.position.z = float(self.pos.pose.position.z)
+                        # self.pose_when_landing.pose.orientation.x = 0
+                        # self.pose_when_landing.pose.orientation.y = 0
+                        # self.pose_when_landing.pose.orientation.z = 0
+                        # self.pose_when_landing.pose.orientation.w = 1
+                        
                         self.pose_when_landing.pose.position.z = self.landing_altitude
+                        if self.land_while_ugv_is_moving :
+                            self.ugv_vio_pos_when_landed = copy.deepcopy(self.ugv_vio_pos)
+                            # self.ugv_vio_pos_when_landed = Odometry()
+                            # self.ugv_vio_pos_when_landed.pose.pose.position.x = float(self.ugv_vio_pos.pose.pose.position.x)
+                            # self.ugv_vio_pos_when_landed.pose.pose.position.y = float(self.ugv_vio_pos.pose.pose.position.y)
+                            # self.ugv_vio_pos_when_landed.pose.pose.position.z = float(self.ugv_vio_pos.pose.pose.position.z)
+                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.x = 0
+                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.y = 0
+                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.z = 0
+                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.w = 1
                 
                 self.objective = self.pos
                 self.objective.header.stamp = rospy.Time.now()
