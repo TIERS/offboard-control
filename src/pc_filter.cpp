@@ -13,6 +13,7 @@
 #include <pcl/io/pcd_io.h>
 #include <iostream>
 #include <memory>
+#include <math.h>
 
 float x_clip_min_;
 float x_clip_max_;
@@ -239,63 +240,73 @@ void filterCallback(const sensor_msgs::PointCloud2ConstPtr& sensor_message_pc)
     if(cluster_indices.size() >=1 )
     {
       bool flag = false;
-      double avg_small_x, avg_small_y, avg_big_x, avg_big_y;
+      double avg_small_x, avg_small_y, avg_small_z, avg_big_x, avg_big_y, avg_big_z;
       std::sort(cluster_indices.begin(), cluster_indices.end(), campare_condition);
       big_cluster = cluster_indices[0].indices;
       double sum_big_x = 0.0;
       double sum_big_y = 0.0;
+      double sum_big_z = 0.0;
       for (std::vector<int>::const_iterator pit = big_cluster.begin(); pit != big_cluster.end(); ++pit)
       {
         // cloud_0->points.push_back(cloud_green_xyz->points[*pit]); 
         sum_big_x += cloud_green_xyz->points[*pit].x;
         sum_big_y += cloud_green_xyz->points[*pit].y;
+        sum_big_z += cloud_green_xyz->points[*pit].z;
       }
       avg_big_x = sum_big_x / big_cluster.size();
       avg_big_y = sum_big_y / big_cluster.size();
+      avg_big_z = sum_big_z / big_cluster.size();
       ROS_INFO_STREAM("Big Tag: Points Size: " << big_cluster.size());
-      ROS_INFO_STREAM("Big Tag: Average x and y: " << avg_big_x << " , " << avg_big_y);
+      ROS_INFO_STREAM("Big Tag: Average x, y, z: " << avg_big_x << " , " << avg_big_y << " , " << avg_big_z);
 
       if(cluster_indices.size() > 1)
       {
         small_cluster = cluster_indices[1].indices;
         double sum_small_x = 0.0;
         double sum_small_y = 0.0;
+        double sum_small_z = 0.0;
         for (std::vector<int>::const_iterator pit = small_cluster.begin(); pit != small_cluster.end(); ++pit)
         {
           // cloud_1->points.push_back(cloud_green_xyz->points[*pit]); 
           sum_small_x += cloud_green_xyz->points[*pit].x;
           sum_small_y += cloud_green_xyz->points[*pit].y;
+          sum_small_z += cloud_green_xyz->points[*pit].z;
         }
 
         avg_small_x = sum_small_x / small_cluster.size();
         avg_small_y = sum_small_y / small_cluster.size();
+        avg_small_z = sum_small_z / small_cluster.size();
 
         ROS_INFO_STREAM("Small Tag: Points Size: " << small_cluster.size());
-        ROS_INFO_STREAM("Small Tag: Average x and y: " << avg_small_x << " , " << avg_small_y);
+        ROS_INFO_STREAM("Small Tag: Average x , y, and z: " << avg_small_x << " , " << avg_small_y << " , " << avg_small_z);
 
         flag = true;
       }
 
       if(flag){
-        double dist = std::hypot(avg_big_x - avg_small_x, avg_big_y - avg_small_y);
-        if(dist>0.24 && dist < 0.26)
+        double dist = std::sqrt(pow(avg_big_x - avg_small_x, 2) + pow(avg_big_y - avg_small_y, 2) + pow(avg_big_z - avg_small_z, 2));
+        ROS_INFO_STREAM("Tags dist: " << dist);
+        if(dist>0.23 && dist < 0.26)
         {
           geometry_msgs::PoseStamped big_tag_msg;
           big_tag_msg.header.stamp = ros::Time::now();
           big_tag_msg.pose.position.x = avg_big_x;
           big_tag_msg.pose.position.y = avg_big_y;
+          big_tag_msg.pose.position.z = avg_big_z;
           uav_big_tag_xy_pub.publish(big_tag_msg);
 
           geometry_msgs::PoseStamped small_tag_msg;
           small_tag_msg.header.stamp = ros::Time::now();
           small_tag_msg.pose.position.x = avg_small_x;
           small_tag_msg.pose.position.y = avg_small_y;
+          small_tag_msg.pose.position.z = avg_small_z;
           uav_small_tag_xy_pub.publish(small_tag_msg);
 
           geometry_msgs::PoseStamped tag_center_msg;
           tag_center_msg.header.stamp = ros::Time::now();
           tag_center_msg.pose.position.x = (avg_big_x + avg_small_x)/2.0;
           tag_center_msg.pose.position.y = (avg_big_y + avg_small_y)/2.0;
+          tag_center_msg.pose.position.z = (avg_big_z + avg_small_z)/2.0;
           uav_tag_center_xy_pub.publish(tag_center_msg);
 
           sensor_msgs::Range range_msg;

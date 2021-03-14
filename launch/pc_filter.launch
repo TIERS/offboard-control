@@ -1,11 +1,11 @@
 <launch>
    <group ns="pc_filter">
-      <param name="xpassthrough/filter_limit_min" value="-0.5" />
-      <param name="ypassthrough/filter_limit_min" value="-0.5" />
-      <param name="zpassthrough/filter_limit_min" value="0.2" />
-      <param name="xpassthrough/filter_limit_max" value="0.5" />
-      <param name="ypassthrough/filter_limit_max" value="0.5" />
-      <param name="zpassthrough/filter_limit_max" value="1.0" />
+      <param name="xpassthrough/filter_limit_min" value="-1.8" />
+      <param name="ypassthrough/filter_limit_min" value="-1.8" />
+      <param name="zpassthrough/filter_limit_min" value="-1.8" />
+      <param name="xpassthrough/filter_limit_max" value="1.8" />
+      <param name="ypassthrough/filter_limit_max" value="1.8" />
+      <param name="zpassthrough/filter_limit_max" value="1.8" />
       <param name="target_color/r" value="50" />
       <param name="target_color/g" value="50" />
       <param name="target_color/b" value="50" />
@@ -15,7 +15,7 @@
       
       <param name="observed_frame_id" value="camera_depth_optical_frame" />
       <param name="filtered_frame_id" value="camera_depth_optical_frame" />
-      <param name="input_pc_topic" value="/camera/depth/color/points" />
+      <param name="input_pc_topic" value="/ugv/camera/depth/color/points" />
       <param name="output_pc_topic" value="/filtered_pc" />
       <param name="ugv_center_xy_topic" value="/ugv_center" />
       <param name="uav_big_tag_xy_topic" value="/uav_big_tag_xy" />
