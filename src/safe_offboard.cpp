@@ -17,6 +17,7 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     flight_mode_ = "stay";
     takeoff_height_ = 1.0;
     circle_radius_ = 1.0;
+    square_side_ = 2.0;
     pos_valid_time_ = 1.0;
     waypoint_valid_time_ = 1.0;
     emergency_landing_ = false;
@@ -27,6 +28,7 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     std::vector<double> flying_fence {-2.0,-2.0, 0.0, 2.0, 2.0, 2.0};
     nhh.param<double>("takeoff_height", takeoff_height_, 1.23);
     nhh.param<double>("circle_radius", circle_radius_, 1.23);
+    nhh.param<double>("square_side", square_side_, 2);
     nhh.param<std::string>("flight_mode", flight_mode_, std::string("stay"));
     nhh.param<double>("pos_valid_time", pos_valid_time_, 1.0);
     nhh.param<double>("waypoint_valid_time", waypoint_valid_time_, 1.0);
@@ -118,12 +120,16 @@ void safe_offboard::mode_cb(const std_msgs::String::ConstPtr& msg)
     {
         flight_mode_ = "circle";
     }
+    else if (msg->data == "square")
+    {
+        flight_mode_ = "square";
+    }
     else if (msg->data == "external_control")
     {
         flight_mode_ = "external_control";
     }
     else{
-        // keep the last mode
+        // keep the previous mode
     }
 }
 
@@ -352,6 +358,42 @@ void safe_offboard::update_current_objective(){
             next_waypoint_.pose.orientation.w = 1;
             next_waypoint_.header.stamp = ros::Time::now();      
         }
+        else if (flight_mode_ == "square" && offboard_state_ == "flying")
+        {
+            double theta = atan2(current_pos_.pose.position.y, current_pos_.pose.position.x);
+            double new_theta = fmod(theta + 0.5, 2*M_PI);
+            switch(new_theta) 
+            {
+                case (new_theta >= -3*M_PI/4 && new_theta < -M_PI/4)
+                {
+                    next_waypoint_.pose.position.x = square_side_ * cos(new_theta) / 2.0;
+                    next_waypoint_.pose.position.y = - square_side_ / 2.0;
+                }
+                case (new_theta >= -M_PI/4 && new_theta < M_PI/4)
+                {
+                    next_waypoint_.pose.position.x = square_side_ / 2.0;
+                    next_waypoint_.pose.position.y = square_side_ * sin(new_theta) / 2.0;
+                }
+                case (new_theta >= M_PI/2 && new_theta < 3*M_PI/4)
+                {
+                    next_waypoint_.pose.position.x = square_side_ * cos(new_theta) / 2.0;
+                    next_waypoint_.pose.position.y = square_side_ / 2.0;
+                }
+                case (new_theta >= 3*M_PI/4 || new_theta < -3*M_PI/4)
+                {
+                    next_waypoint_.pose.position.x = - square_side_ / 2.0;
+                    next_waypoint_.pose.position.y = square_side_ * sin(new_theta) / 2.0;
+                }
+            }
+            
+            next_waypoint_.pose.position.z = takeoff_height_;
+
+            next_waypoint_.pose.orientation.x = 0;
+            next_waypoint_.pose.orientation.y = 0;
+            next_waypoint_.pose.orientation.z = 0;
+            next_waypoint_.pose.orientation.w = 1;
+            next_waypoint_.header.stamp = ros::Time::now();      
+        }
         else if (flight_mode_ == "external_control" && offboard_state_ == "flying")
         {
             next_waypoint_ = next_external_waypoint_;
@@ -369,25 +411,31 @@ void safe_offboard::update_current_objective(geometry_msgs::PoseStamped& objecti
 void safe_offboard::set_flight_mode(std::string flight_mode)
 {
     flight_mode_ = flight_mode;
-    ROS_INFO_STREAM("Set Flight Mode Is " << flight_mode_);
+    ROS_INFO_STREAM("Set Flight Mode to " << flight_mode_);
 }
 
 void safe_offboard::set_takeoff_height(double takeoff_height)
 {
     takeoff_height_ = takeoff_height;
-    ROS_INFO_STREAM("Set Takeoff Height Is " << takeoff_height_);
+    ROS_INFO_STREAM("Set Takeoff Height to " << takeoff_height_);
 }
 
 void safe_offboard::set_circle_radius(double circle_radius)
 {
     circle_radius_ = circle_radius;
-    ROS_INFO_STREAM("Set Circle Radius Is " << circle_radius_);
+    ROS_INFO_STREAM("Set Circle Radius to " << circle_radius_);
+} 
+
+void safe_offboard::set_square_side(double square_side)
+{
+    square_side_ = square_side;
+    ROS_INFO_STREAM("Set Square Side to " << square_side_);
 } 
 
 void safe_offboard::set_home_pos(geometry_msgs::PoseStamped& pose)
 {
     home_pos_ = pose;
-    ROS_INFO_STREAM("Home Position Is (" << pose.pose.position.x << " , "
+    ROS_INFO_STREAM("Home Position set to (" << pose.pose.position.x << " , "
                     << pose.pose.position.y << " , "
                     << pose.pose.position.z << ")");
 }
