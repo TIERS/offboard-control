@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.com/TIERS/offboard-control.svg?branch=main)](https://travis-ci.com/TIERS/offboard-control)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # Offboard control
 # PX4+MAVROS with UWB+VIO localization
 
