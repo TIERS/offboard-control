@@ -358,6 +358,7 @@ void safe_offboard::update_current_objective(){
             next_waypoint_.pose.orientation.w = 1;
             next_waypoint_.header.stamp = ros::Time::now();      
         }
+	/*
         else if (flight_mode_ == "square" && offboard_state_ == "flying")
         {
             double theta = atan2(current_pos_.pose.position.y, current_pos_.pose.position.x);
@@ -385,7 +386,7 @@ void safe_offboard::update_current_objective(){
                     next_waypoint_.pose.position.y = square_side_ * sin(new_theta) / 2.0;
                 }
             }
-            
+
             next_waypoint_.pose.position.z = takeoff_height_;
 
             next_waypoint_.pose.orientation.x = 0;
@@ -394,6 +395,7 @@ void safe_offboard::update_current_objective(){
             next_waypoint_.pose.orientation.w = 1;
             next_waypoint_.header.stamp = ros::Time::now();      
         }
+	*/
         else if (flight_mode_ == "external_control" && offboard_state_ == "flying")
         {
             next_waypoint_ = next_external_waypoint_;
@@ -426,11 +428,12 @@ void safe_offboard::set_circle_radius(double circle_radius)
     ROS_INFO_STREAM("Set Circle Radius to " << circle_radius_);
 } 
 
+/*
 void safe_offboard::set_square_side(double square_side)
 {
     square_side_ = square_side;
     ROS_INFO_STREAM("Set Square Side to " << square_side_);
-} 
+} */
 
 void safe_offboard::set_home_pos(geometry_msgs::PoseStamped& pose)
 {
