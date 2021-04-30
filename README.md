@@ -1,6 +1,8 @@
+[![Build Status](https://travis-ci.com/TIERS/offboard-control.svg?branch=main)](https://travis-ci.com/TIERS/offboard-control)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # Offboard control
 # PX4+MAVROS with UWB+VIO localization
-# and multi-robot collaboration
 
 Offboard controller for PX4 flight controllers with MAVROS. Uses UWB+VIO for localizartion in GNSS-denied environments.
 
@@ -118,7 +120,5 @@ Place the following in a launch file:
 
 
 ## Contact
-
-For any questions, write to `jopequ@utu.fi`, `qingqli@utu.fi`, or `xianjia.yu@utu.fi`.
 
 Visit us at [https://tiers.utu.fi](https://tiers.utu.fi)
