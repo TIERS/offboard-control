@@ -10,7 +10,12 @@
         <param name="verbose" value="False" />
     </node> -->
 
-    <node name="UWB_4by4" pkg="offboard_control" type="uwb4by4" respawn="true" output="screen">
+    <!-- <node name="UWB_4by4" pkg="offboard_control" type="uwb4by4" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
+        <param name="verbose" value="False" />
+    </node> -->
+
+    <node name="uwb2by4" pkg="offboard_control" type="uwb2by4" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
         <param name="verbose" value="False" />
     </node>
