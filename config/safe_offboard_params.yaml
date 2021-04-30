@@ -19,4 +19,4 @@ circle_radius:        0.6
 square_side:          2
 pos_valid_time:       1.0
 waypoint_valid_time:  1.0
-fly_fence:            [-2.1, -1, 0.0, 1.5, 3.5, 1.8]
+fly_fence:            [-2.5, -3.5, 0.0, 1, 3.5, 1.9]

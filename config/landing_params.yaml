@@ -23,6 +23,7 @@ waypoint_step:        0.3
 approaching_altitude: 1.7
 closing_altitude:     1.5
 landing_altitude:     1.3
+done_altitude:        0.6
 
 closing_dist:         1.5
 landing_dist:         0.8
@@ -31,7 +32,7 @@ landing_stop_dist:    0.04
 min_accumulated_meas: 20
 min_intermeas_dist:   0.2
 
-max_landing_trials :  4
+max_landing_trials :  2
 min_landing_stay:     8
 min_home_stay:        1
 
@@ -40,8 +41,8 @@ custom_uwb_ysep:      0.58
 custom_uwb_xoffset:   0.29
 custom_uwb_yoffset:   0.29
 
-using_custom_uwb:     False
+using_custom_uwb:     True
 num_of_custom_uwb:    4
 
 using_4x4_uwb:        False
-land_while_ugv_moves: True
+land_while_ugv_moves: False
