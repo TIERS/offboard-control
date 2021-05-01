@@ -10,7 +10,6 @@ import numpy
 
 from std_msgs.msg       import String
 from std_msgs.msg       import Float64
-from std_msgs.msg       import Integer
 
 from nav_msgs.msg       import Odometry
 
@@ -110,6 +109,10 @@ class LandingControl() :
         self.uav_uwb_subscriber = rospy.Subscriber(self.uav_uwb_topic, PoseStamped, self.uav_uwb_cb)
         self.ugv_uwb_subscriber = rospy.Subscriber(self.ugv_uwb_topic, PoseStamped, self.ugv_uwb_cb)
 
+        # Fake UWB pos publishers 
+        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/fake", PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/fake", PoseStamped, queue_size=10)
+
         # UGV VIO pose (lower freq)
         self.ugv_vio_pos = Odometry()
         self.ugv_vio_topic = rospy.get_param("~ugv_vio_topic", "/ugv/t265/odom/sample")
@@ -176,10 +179,10 @@ class LandingControl() :
         self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.custom_uwbC_cb)
         self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.custom_uwbD_cb)
 
-        self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.second_uwbA_cb)
-        self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.second_uwbB_cb)
-        self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.second_uwbC_cb)
-        self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
+        # self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.second_uwbA_cb)
+        # self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.second_uwbB_cb)
+        # self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.second_uwbC_cb)
+        # self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
 
 
         # UWB pairs to calculate relative pos and average
@@ -193,18 +196,22 @@ class LandingControl() :
             [3, 2, -1, self.ugv_x0, 0, self.ugv_y0]
         ]
 
+        # Relative position estimation
+        self.using_multilateration = rospy.get_param("~using_multilateration", False)
+        self.using_optimization = rospy.get_param("~using_optimization", False)
+
         # Landing state publisher
         self.landing_state = "waiting"
         self.landing_state_pub = rospy.Publisher("/uav/landing/state", String, queue_size=10)
-        self.landing_state_num_pub = rospy.Publisher("/uav/landing/state/id", Integer, queue_size=10)
+        self.landing_state_num_pub = rospy.Publisher("/uav/landing/state/id", Float64, queue_size=10)
         self.landing_state_dict = {
-            "waiting" : 0,
-            "approaching" : 1,
-            "closing_in" : 2,
-            "landing" : 3,
-            "landing_counting" : 4,
-            "landing_done" : 6,
-            "going_back" : 5
+            "waiting" : 0.0,
+            "approaching" : 1.0,
+            "closing_in" : 2.0,
+            "landing" : 3.0,
+            "landing_counting" : 4.0,
+            "landing_done" : 6.0,
+            "going_back" : 5.0
         }
 
     def update_current_pos_cb(self, pos) :
@@ -556,8 +563,14 @@ class LandingControl() :
                 # Check at least two ranges are available
                 self.check_min_uwb_ranges()
                 if self.min_uwb_ranges :
-                    # self.calculate_relative_uwb_poses()
-                    self.calculate_relative_pos_least_squares()
+                    if self.using_multilateration :
+                        self.calculate_relative_uwb_poses()
+                    elif self.using_optimization :
+                        self.calculate_relative_pos_least_squares()
+                    else :
+                        rospy.logerr("Choose either multilateration or optimization to calculate relative UWB positions.")
+                    self.uav_uwb_fake_publisher.publish(self.uav_uwb_pos)
+                    self.ugv_uwb_fake_publisher.publish(self.ugv_uwb_pos)
                 else :
                     rospy.logwarn("Not enough UWB ranges have been locked...")
 
@@ -659,7 +672,7 @@ class LandingControl() :
 
                 self.control_pub.publish(self.objective)
 
-    def publish_landing_state(self) :
+    def publish_landing_state(self, target) :
         '''
             Publishes landing state (TODO create custom ROS message)
             Initially:
