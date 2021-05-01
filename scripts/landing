@@ -460,6 +460,22 @@ class LandingControl() :
         '''
         self.objective = PoseStamped()
 
+        if self.using_custom_uwb :
+
+            # Check at least two ranges are available
+            self.check_min_uwb_ranges()
+            if self.min_uwb_ranges :
+                if self.using_multilateration :
+                    self.calculate_relative_uwb_poses()
+                elif self.using_optimization :
+                    self.calculate_relative_pos_least_squares()
+                else :
+                    rospy.logerr("Choose either multilateration or optimization to calculate relative UWB positions.")
+                self.uav_uwb_fake_publisher.publish(self.uav_uwb_pos)
+                self.ugv_uwb_fake_publisher.publish(self.ugv_uwb_pos)
+            else :
+                rospy.logwarn("Not enough UWB ranges have been locked...")
+
         if self.going_back_home :
             rospy.loginfo("Going back home FLAG")
             self.objective = self.pos
@@ -558,22 +574,6 @@ class LandingControl() :
 
         else :
 
-            if self.using_custom_uwb :
-
-                # Check at least two ranges are available
-                self.check_min_uwb_ranges()
-                if self.min_uwb_ranges :
-                    if self.using_multilateration :
-                        self.calculate_relative_uwb_poses()
-                    elif self.using_optimization :
-                        self.calculate_relative_pos_least_squares()
-                    else :
-                        rospy.logerr("Choose either multilateration or optimization to calculate relative UWB positions.")
-                    self.uav_uwb_fake_publisher.publish(self.uav_uwb_pos)
-                    self.ugv_uwb_fake_publisher.publish(self.ugv_uwb_pos)
-                else :
-                    rospy.logwarn("Not enough UWB ranges have been locked...")
-
             if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
                 self.publishing_objective = False
                 rospy.logwarn("Not receiving UGV UWB pose updates...")
@@ -622,26 +622,10 @@ class LandingControl() :
                         self.landing_state = "landing_done"
                         self.landing_done = True
                         self.pose_when_landing = copy.deepcopy(self.pos)
-                        # self.pose_when_landing = PoseStamped()
-                        # self.pose_when_landing.pose.position.x = float(self.pos.pose.position.x)
-                        # self.pose_when_landing.pose.position.y = float(self.pos.pose.position.y)
-                        # self.pose_when_landing.pose.position.z = float(self.pos.pose.position.z)
-                        # self.pose_when_landing.pose.orientation.x = 0
-                        # self.pose_when_landing.pose.orientation.y = 0
-                        # self.pose_when_landing.pose.orientation.z = 0
-                        # self.pose_when_landing.pose.orientation.w = 1
                         
                         self.pose_when_landing.pose.position.z = self.landing_altitude
                         if self.land_while_ugv_is_moving :
                             self.ugv_vio_pos_when_landed = copy.deepcopy(self.ugv_vio_pos)
-                            # self.ugv_vio_pos_when_landed = Odometry()
-                            # self.ugv_vio_pos_when_landed.pose.pose.position.x = float(self.ugv_vio_pos.pose.pose.position.x)
-                            # self.ugv_vio_pos_when_landed.pose.pose.position.y = float(self.ugv_vio_pos.pose.pose.position.y)
-                            # self.ugv_vio_pos_when_landed.pose.pose.position.z = float(self.ugv_vio_pos.pose.pose.position.z)
-                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.x = 0
-                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.y = 0
-                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.z = 0
-                            # self.ugv_vio_pos_when_landed.pose.pose.orientation.w = 1
                 
                 self.objective = self.pos
                 self.objective.header.stamp = rospy.Time.now()
