@@ -523,7 +523,7 @@ class LandingControl() :
             return
 
         if self.going_back_home :
-            self.landing_state = "landing_done"
+            self.landing_state = "going_back"
             rospy.loginfo("Going back home FLAG")
             self.objective = self.pos
             self.objective.pose.position.z = self.approaching_altitude
