@@ -3,19 +3,20 @@
     For more info on the documentation go to https://www.decawave.com/sites/default/files/dwm1001-api-guide.pdf
 """
 
-import rospy, time, serial, os, sys, random
+import os
+import sys
+import time
+import rospy
+import serial
 
 from geometry_msgs.msg  import Pose
 from std_msgs.msg       import Float64
 
-# initialize ros rate 10hz
-
-
-# initialize serial port connections
-
-
 
 class dwm1001_localizer:
+    """
+        TODO Docstring
+    """
 
     def __init__(self) :
         """
@@ -23,7 +24,7 @@ class dwm1001_localizer:
         """
 
         # Init node
-        rospy.init_node('DWM1001_Active_{}'.format(random.randint(0,100000)), anonymous=False)
+        rospy.init_node('DWM1001_Double_Initiator', anonymous=False)
 
         # Get port and tag name
         self.dwm_port1 = rospy.get_param('~port1', '/dev/ttyACM1')
@@ -64,25 +65,27 @@ class dwm1001_localizer:
         :returns: none
         """
 
-        # close the serial port in case the previous run didn't closed it properly
+        # Close the serial port in case the previous run didn't closed it properly
         self.serialPortDWM1001_1.close()
         self.serialPortDWM1001_2.close()
-        # sleep for one sec
+        
+        # Sleep for one sec
         time.sleep(1)
-        # open serial port
+        
+        # Open serial port
         self.serialPortDWM1001_1.open()
         self.serialPortDWM1001_2.open()
 
-        # check if the serial port is opened
+        # Check if the serial port is opened
         if(self.serialPortDWM1001_1.isOpen()):
-            rospy.loginfo("Port O opened: "+ str(self.serialPortDWM1001_1.name) )
+            rospy.loginfo("Port `O` opened: {}".format(self.serialPortDWM1001_1.name) )
         else:
-            rospy.loginfo("Can't O  open port: "+ str(self.serialPortDWM1001_1.name))
+            rospy.logerr("Can't open port O: {}".format(self.serialPortDWM1001_1.name))
         
         if(self.serialPortDWM1001_2.isOpen()):
-            rospy.loginfo("Port P  opened: "+ str(self.serialPortDWM1001_2.name) )
+            rospy.loginfo("Port `P` opened: {}".format(self.serialPortDWM1001_2.name) )
         else:
-            rospy.loginfo("Can't P open port: "+ str(self.serialPortDWM1001_2.name))
+            rospy.logerr("Can't open port P: {}".format(self.serialPortDWM1001_2.name))
 
         try: 
             tags = ['A', 'B', 'C', 'D']
@@ -113,12 +116,10 @@ class dwm1001_localizer:
                     msg_portP_cnt[tags.index(serialReadLine[9])] += 1 
                     self.rate.sleep()
 
-                if sum(msg_portO_cnt) > 100:
-                    rospy.loginfo("Running well. Done O-> {}, P-> {} times !".format(msg_portO_cnt, msg_portP_cnt))
+                if sum(msg_portO_cnt) > 100 and self.verbose :
+                    rospy.loginfo("All OK. Done O-> {}, P-> {} times !".format(msg_portO_cnt, msg_portP_cnt))
                     msg_portO_cnt = [0,0,0,0]
                     msg_portP_cnt = [0,0,0,0]
-                # except IndexError:
-                #     rospy.loginfo("Found index error in the network array! DO SOMETHING!")
 
         finally:
             rospy.loginfo("Quitting, and sending reset command to dev board")
@@ -142,35 +143,21 @@ class dwm1001_localizer:
         node_id = initTagID + '2' + arrayData[1]
  
         if node_id not in self.topics :
-            print("NodeID: ", node_id)
-            # tag_name = ""
-            # if node_id == 'A':
-            #     tag_name = "tag_A"
-            # elif node_id == 'B':
-            #     tag_name = "tag_B"
-            # elif node_id == 'C':
-            #     tag_name = "tag_C"
-            # elif node_id == 'D':
-            #     tag_name = "tag_D"
-                
-            # else:
-            #     rospy.logwarn("WRONG NODE ID; Return !")
-            #     return 
-  
+            rospy.loginfo("NodeID: {}".format(node_id))
             self.topics[node_id] = rospy.Publisher('/dwm1001/'+ node_id + "/distance", Float64, queue_size=100)
 
         try :
             dist = float(arrayData[3])
             if self.verbose :
-                print("Publish distance topic : ", dist)
+                rospy.loginfo("Publishing a new distance topic: {}".format(dist))
             self.topics[node_id].publish(dist)
         except :
             rospy.logwarn("WRONG DISTANCE data!")
+
 
 if __name__ == '__main__':
     try:
         dwm1001 = dwm1001_localizer()
         dwm1001.main()
-        # rospy.spin()
     except rospy.ROSInterruptException:
         pass
