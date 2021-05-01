@@ -34,18 +34,22 @@ min_intermeas_dist:     0.2
 
 max_landing_trials :    2
 min_landing_stay:       8
-min_home_stay:          1
+min_home_stay:          2
 
-custom_uwb_xsep:        0.58
-custom_uwb_ysep:        0.58
-custom_uwb_xoffset:     0.29
-custom_uwb_yoffset:     0.29
+custom_uwb_xsep:        0.56
+custom_uwb_ysep:        0.56
+custom_uwb_xoffset:     0.28
+custom_uwb_yoffset:     0.28
 
 using_custom_uwb:       True
 num_of_custom_uwb:      4
+
+clone_ugv_orientation:  False
 
 using_4x4_uwb:          False
 land_while_ugv_moves:   False
 
 using_multilateration:  False
 using_optimization:     True
+
+landing_activated:      False

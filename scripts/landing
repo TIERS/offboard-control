@@ -157,6 +157,10 @@ class LandingControl() :
         # Custom one-to-four UWB ranging
         self.custom_uwb_ranges = numpy.ones(4)
         self.custom_uwb_stamps = [rospy.Time()] * 4
+
+        self.second_custom_uwb_ranges = numpy.ones(4)
+        self.second_custom_uwb_stamps = [rospy.Time()] * 4
+
         self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
         self.num_uwb_in_use = rospy.get_param("~num_of_custom_uwb", 4)
         self.min_uwb_ranges = False     # At least 2 transceivers should be active...
@@ -179,11 +183,12 @@ class LandingControl() :
         self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.custom_uwbC_cb)
         self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.custom_uwbD_cb)
 
-        # self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.second_uwbA_cb)
-        # self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.second_uwbB_cb)
-        # self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.second_uwbC_cb)
-        # self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
+        self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.second_uwbA_cb)
+        self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.second_uwbB_cb)
+        self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.second_uwbC_cb)
+        self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
 
+        self.clone_ugv_orientation = rospy.get_param("~clone_ugv_orientation", False)
 
         # UWB pairs to calculate relative pos and average
         # 3rd element means x is calculated with cos (+1) or sin (-1)
@@ -213,6 +218,8 @@ class LandingControl() :
             "landing_done" : 6.0,
             "going_back" : 5.0
         }
+
+        self.activated = rospy.get_param("~landing_activated", False)
 
     def update_current_pos_cb(self, pos) :
         '''
@@ -300,6 +307,42 @@ class LandingControl() :
         if self.custom_uwb_ranges[3] < 0 :
             self.custom_uwb_ranges[3] = 0
         self.custom_uwb_stamps[3] = rospy.Time.now()
+
+    def second_uwbA_cb(self, range) :
+        '''
+            Update range to custom UWB A
+        '''
+        self.second_custom_uwb_ranges[0] = range.data - 0.27
+        if self.second_custom_uwb_ranges[0] < 0 :
+            self.second_custom_uwb_ranges[0] = 0
+        self.second_custom_uwb_stamps[0] = rospy.Time.now()
+
+    def second_uwbB_cb(self, range) :
+        '''
+            Update range to custom UWB B
+        '''
+        self.second_custom_uwb_ranges[1] = range.data - 0.27
+        if self.second_custom_uwb_ranges[1] < 0 :
+            self.second_custom_uwb_ranges[1] = 0
+        self.second_custom_uwb_stamps[1] = rospy.Time.now()
+
+    def second_uwbC_cb(self, range) :
+        '''
+            Update range to custom UWB C
+        '''
+        self.second_custom_uwb_ranges[2] = range.data - 0.27
+        if self.second_custom_uwb_ranges[2] < 0 :
+            self.second_custom_uwb_ranges[2] = 0
+        self.second_custom_uwb_stamps[2] = rospy.Time.now()
+
+    def second_uwbD_cb(self, range) :
+        '''
+            Update range to custom UWB D
+        '''
+        self.second_custom_uwb_ranges[3] = range.data - 0.27
+        if self.second_custom_uwb_ranges[3] < 0 :
+            self.second_custom_uwb_ranges[3] = 0
+        self.second_custom_uwb_stamps[3] = rospy.Time.now()
 
     def lidar_cb(self, range) :
         '''
@@ -476,6 +519,9 @@ class LandingControl() :
             else :
                 rospy.logwarn("Not enough UWB ranges have been locked...")
 
+        if not self.activated :
+            return
+
         if self.going_back_home :
             rospy.loginfo("Going back home FLAG")
             self.objective = self.pos
@@ -648,11 +694,18 @@ class LandingControl() :
                     rospy.logerr("Distance to target of {} does not make sense...".format(self.dist_to_target))
                     self.landing_state = "error"
 
-                # Clone orientation to UGV's
+                # Set orientation
                 self.objective.pose.orientation.x = 0#self.ugv_vio_pos.pose.pose.orientation.x
                 self.objective.pose.orientation.y = 0#self.ugv_vio_pos.pose.pose.orientation.y
                 self.objective.pose.orientation.z = 0#self.ugv_vio_pos.pose.pose.orientation.z
                 self.objective.pose.orientation.w = 1#self.ugv_vio_pos.pose.pose.orientation.w
+
+                # Clone orientation to UGV
+                if self.clone_ugv_orientation :
+                    self.objective.pose.orientation.x = self.ugv_vio_pos.pose.pose.orientation.x
+                    self.objective.pose.orientation.y = self.ugv_vio_pos.pose.pose.orientation.y
+                    self.objective.pose.orientation.z = self.ugv_vio_pos.pose.pose.orientation.z
+                    self.objective.pose.orientation.w = self.ugv_vio_pos.pose.pose.orientation.w
 
                 self.control_pub.publish(self.objective)
 
