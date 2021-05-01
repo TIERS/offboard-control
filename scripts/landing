@@ -178,15 +178,15 @@ class LandingControl() :
         # self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/tag_C/distance", Float64, self.custom_uwbC_cb)
         # self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/tag_D/distance", Float64, self.custom_uwbD_cb)
 
-        self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/O2A/distance", Float64, self.custom_uwbA_cb)
-        self.custom_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/O2B/distance", Float64, self.custom_uwbB_cb)
-        self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.custom_uwbC_cb)
-        self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.custom_uwbD_cb)
+        self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.custom_uwbA_cb)
+        self.custom_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.custom_uwbB_cb)
+        self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.custom_uwbC_cb)
+        self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.custom_uwbD_cb)
 
-        self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.second_uwbA_cb)
-        self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.second_uwbB_cb)
-        self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.second_uwbC_cb)
-        self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
+        self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/O2A/distance", Float64, self.second_uwbA_cb)
+        self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/O2B/distance", Float64, self.second_uwbB_cb)
+        self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.second_uwbC_cb)
+        self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.second_uwbD_cb)
 
         self.clone_ugv_orientation = rospy.get_param("~clone_ugv_orientation", False)
 
@@ -523,6 +523,7 @@ class LandingControl() :
             return
 
         if self.going_back_home :
+            self.landing_state = "landing_done"
             rospy.loginfo("Going back home FLAG")
             self.objective = self.pos
             self.objective.pose.position.z = self.approaching_altitude
@@ -574,6 +575,7 @@ class LandingControl() :
             self.control_pub.publish(self.objective)
 
         elif self.landing_done :
+            self.landing_state = "landing_done"
 
             # Stay stationary
             self.objective = copy.deepcopy(self.pose_when_landing)
