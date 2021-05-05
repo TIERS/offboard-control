@@ -49,7 +49,7 @@ clone_ugv_orientation:  False
 using_4x4_uwb:          False
 land_while_ugv_moves:   False
 
-using_multilateration:  False
-using_optimization:     True
+using_multilateration:  True
+using_optimization:     False
 
-landing_activated:      False
+landing_activated:      True
