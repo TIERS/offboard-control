@@ -7,7 +7,7 @@ mkdir -p recordings
 dt=$(date '+%d%m%Y_%H%M%S');
 
 # Dump all params
-rosparam dump ${dt}_landing_trials_params_dump.yaml
+rosparam dump recordings/${dt}_landing_trials_params_dump.yaml
 
 # Get some of the landing params
 customuwb=$(rosparam get /uav/UWB_VIO_Landing/using_custom_uwb);
