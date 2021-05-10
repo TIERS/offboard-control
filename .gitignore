@@ -55,3 +55,6 @@ CATKIN_IGNORE
 scripts/*.py
 recordings/*
 scripts/*old
+scripts/utils/*
+*old
+*old.py
