@@ -52,3 +52,9 @@ CATKIN_IGNORE
 
 # Others
 .vscode
+scripts/*.py
+recordings/*
+scripts/*old
+scripts/utils/*
+*old
+*old.py
