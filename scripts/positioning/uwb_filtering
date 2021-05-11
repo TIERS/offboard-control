@@ -49,11 +49,12 @@ class UWBParticleFilter() :
 
         # Particle filter params
         self.weights_sigma = rospy.get_param("~weights_sigma", 1.2)
-        self.num_particles = rospy.get_param("~num_particles", 400)
+        self.num_particles = rospy.get_param("~num_particles", 100)
         self.uwb_noise = rospy.get_param("~uwb_noise", 0.15)
         self.resample_proportion = rospy.get_param("~resample_proportion", 0.01)
 
         # Create filter
+        self.prior_fn = lambda n: numpy.random.uniform(-2.4,2.4,(n,2))
         self.pf = ParticleFilter(
             prior_fn =              self.prior_fn, 
             observe_fn =            self.calc_dists,  
@@ -68,15 +69,14 @@ class UWBParticleFilter() :
         self.odom = Odometry()
         self.vio_topic =  rospy.get_param("~uav_vio_topic", "/uav/t265/odom/sample")
         rospy.loginfo("Subscribing to odometry at {}".format(self.vio_topic))
-        self.odom_sub = rospy.Subscriber(self.vio_topic, PoseStamped, self.update_odom)
+        self.odom_sub = rospy.Subscriber(self.vio_topic, Odometry, self.update_odom_cb)
 
         # Wait to get some odometry
         sys.stdout.write("Waiting for odom...")
-        while not self.pos.header.stamp :
+        while not self.odom.header.stamp :
             sys.stdout.write("..")
             sys.stdout.flush()
             time.sleep(0.1)
-        self.home_pos = self.pos
         rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose.pose))
 
         # Read VIO odom and calculate particle movement
@@ -99,6 +99,15 @@ class UWBParticleFilter() :
         self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
         self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
         self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
+        self.ugv_pos = PoseStamped()
+        self.ugv_pos.header.stamp = rospy.Time.now()
+        self.ugv_pos.pose.position.x = self.ugv_x0
+        self.ugv_pos.pose.position.y = self.ugv_y0
+        self.ugv_pos.pose.position.z = self.responder_offsets[0][2]
+        self.ugv_pos.pose.orientation.x = 0.0
+        self.ugv_pos.pose.orientation.y = 0.0
+        self.ugv_pos.pose.orientation.z = 0.0
+        self.ugv_pos.pose.orientation.w = 1.0
 
         self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
 
@@ -116,14 +125,14 @@ class UWBParticleFilter() :
         # UWB Publishers
         self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
         self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
-        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/filtered", PoseStamped, queue_size=10)
-        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/filtered", PoseStamped, queue_size=10)
+        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/pf", PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/pf", PoseStamped, queue_size=10)
 
-    def update_odom_cb(self, pos) :
+    def update_odom_cb(self, odom) :
         '''
             Update odom from VIO
         '''
-        self.pos = pos
+        self.odom = odom
     
     def custom_uwbA_cb(self, range) :
         '''
@@ -224,14 +233,15 @@ class UWBParticleFilter() :
         y = numpy.zeros((x.shape[0], 4))
         for i, p in enumerate(x3d) :
             for j, q in enumerate(self.responder_offsets) :
-                if self.custom_uwb_ranges[j] - rospy.Time.now() < self.max_pos_delay :
+                if rospy.Time.now() - self.custom_uwb_stamps[j] < rospy.Duration(self.max_pos_delay) :
                     y[i][j] = numpy.linalg.norm(p - q)
                 else :
+                    y[i][j] = -1
                     rospy.logwarn("Not using meas from range {} (old timestamp)".format(j))
 
         return y
 
-    def calc_weights(self, hypotheses, observations, move=None, z = None) :
+    def calc_weights(self, hypotheses, observations, move=None, particles_z=None) :
         '''
             Calculate particle weights based on error
         '''
@@ -242,11 +252,11 @@ class UWBParticleFilter() :
             Upadate particle filter
         '''
         # Get UWB ranges
-        new_meas = [
-            self.custom_uwb_ranges[i] if self.custom_uwb_stamps[1] - rospy.Time.now() < self.max_pos_delay
+        new_meas = numpy.array([
+            self.custom_uwb_ranges[i] if rospy.Time.now() - self.custom_uwb_stamps[1] < rospy.Duration(self.max_pos_delay)
             else -1
             for i in range(4)
-        ]
+        ])
 
         # Calculate odom from last PF uptdate
         self.particle_odom[0] = self.odom.pose.pose.position.x - self.last_particle_odom.pose.pose.position.x
@@ -255,16 +265,40 @@ class UWBParticleFilter() :
         # Get Zs
         particles_z = numpy.ones((self.num_particles, 1)) * self.odom.pose.pose.position.z
 
-        self.pf.update(observed=y, move=self.particle_odom, particles_z=particles_z)
+        self.pf.update(observed=new_meas, move=self.particle_odom, particles_z=particles_z)
 
-        states = [self.pf.transformed_particles, np.array(self.pf.weights)]
+        particles = self.pf.transformed_particles
+        ws = numpy.array(self.pf.weights)
+        mean = numpy.mean(particles, axis=0)
+        # print(particles)
+        rospy.loginfo("PF mean: {}".format(mean))
+        # dev = (means - (particles[:,:,0]).T).T**2
+        # var = np.sum(ws * dev, axis=1)  / 1-np.sum(ws**2)  # unbiased variance
+        # stds = np.sqrt(var)
+
+        # Publish UAV Pose
+        uav_pos = PoseStamped()
+        uav_pos.header.stamp = rospy.Time.now()
+        uav_pos.pose.position.x = mean[0]
+        uav_pos.pose.position.y = mean[1]
+        uav_pos.pose.position.z = self.odom.pose.pose.position.z
+        uav_pos.pose.orientation.x = 0.0
+        uav_pos.pose.orientation.y = 0.0
+        uav_pos.pose.orientation.z = 0.0
+        uav_pos.pose.orientation.w = 1.0
+        self.uav_uwb_fake_publisher.publish(uav_pos)
+
+        # Publish UGV Pose
+        self.ugv_pos = PoseStamped()
+        self.ugv_pos.header.stamp = rospy.Time.now()
+        self.ugv_uwb_fake_publisher.publish(self.ugv_pos)
 
     def run(self) :
         '''
             Create timer to update filter.
         '''
         # Reset filter
-        pf.init_filter()
+        self.pf.init_filter()
 
         # Set filter update timer at 6 Hz
         time.sleep(1)
