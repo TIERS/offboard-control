@@ -24,7 +24,7 @@ from mpl_toolkits.mplot3d       import Axes3D
 class UWBMultiLateral():
     '''
         ROS Node that estimates position of a single or a set of UWB initiators
-        with respect to a set of responders in known positions. It uses a trianglar method
+        with respect to a set of responders in known positions. It uses a triangular method
         to estimate the position.
     '''
 

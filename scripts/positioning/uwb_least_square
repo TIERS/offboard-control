@@ -21,7 +21,7 @@ from mpl_toolkits.mplot3d       import Axes3D
 
 
 import sys
-sys.path.insert(1, '/home/bot/iany_ws/src/offboard-control/scripts/utils')
+sys.path.insert(1, '/home/xianjia/catkin_ws/src/offboard-control/scripts/utils')
 from utils import relative_position_from_four_meas
 
 
@@ -54,12 +54,6 @@ class UWBLeastSquare() :
         self.uav_uwb_pos_acc = [PoseStamped()]*2
         self.ugv_uwb_pos = PoseStamped()
         self.ugv_uwb_pos_acc = [PoseStamped()]*10
-
-        # Particle filter params
-        self.weights_sigma = rospy.get_param("~weights_sigma", 1.2)
-        self.num_particles = rospy.get_param("~num_particles", 400)
-        self.uwb_noise = rospy.get_param("~uwb_noise", 0.15)
-        self.resample_proportion = rospy.get_param("~resample_proportion", 0.01)
 
         # Subscribe to MAVROS position
         # self.odom = Odometry()
@@ -192,7 +186,24 @@ class UWBLeastSquare() :
             self.second_custom_uwb_ranges[3] = 0
         self.second_custom_uwb_stamps[3] = rospy.Time.now()
     
+    def velocity(self, x) :
+        '''
+            Use VIO to update position
+        '''
+        xp = x + self.particle_odom
+        return xp
 
+
+    def calc_weights(self, hypotheses, observations, move=None, z = None) :
+        '''
+            Calculate particle weights based on error
+        '''
+        return squared_error(hypotheses, observations, sigma=self.weights_sigma)
+
+    def update_filter(self, target) :
+        pass
+
+    
     def calculate_relative_pos_least_squares(self, target) :
         '''
             Calculates relative UGV-UAV positions.
@@ -269,7 +280,7 @@ if __name__ == '__main__':
         Run the node
     '''
 
-    # Create new position calculator
+    # Create new filter object
     position_caculator = UWBLeastSquare()
 
     try:
