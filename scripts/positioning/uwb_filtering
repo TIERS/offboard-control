@@ -49,7 +49,7 @@ class UWBParticleFilter() :
 
         # Particle filter params
         self.weights_sigma = rospy.get_param("~weights_sigma", 1.2)
-        self.num_particles = rospy.get_param("~num_particles", 100)
+        self.num_particles = rospy.get_param("~num_particles", 200)
         self.uwb_noise = rospy.get_param("~uwb_noise", 0.15)
         self.resample_proportion = rospy.get_param("~resample_proportion", 0.01)
 
@@ -245,7 +245,9 @@ class UWBParticleFilter() :
         '''
             Calculate particle weights based on error
         '''
-        return squared_error(hypotheses, observations, sigma=self.weights_sigma)
+        w = squared_error(hypotheses, observations, sigma=self.weights_sigma)
+        # print(w)
+        return w
 
     def update_filter(self, target) :
         '''
@@ -261,6 +263,7 @@ class UWBParticleFilter() :
         # Calculate odom from last PF uptdate
         self.particle_odom[0] = self.odom.pose.pose.position.x - self.last_particle_odom.pose.pose.position.x
         self.particle_odom[1] = self.odom.pose.pose.position.y - self.last_particle_odom.pose.pose.position.y
+        self.last_particle_odom = self.odom
 
         # Get Zs
         particles_z = numpy.ones((self.num_particles, 1)) * self.odom.pose.pose.position.z
@@ -270,11 +273,24 @@ class UWBParticleFilter() :
         particles = self.pf.transformed_particles
         ws = numpy.array(self.pf.weights)
         mean = numpy.mean(particles, axis=0)
-        # print(particles)
-        rospy.loginfo("PF mean: {}".format(mean))
-        # dev = (means - (particles[:,:,0]).T).T**2
-        # var = np.sum(ws * dev, axis=1)  / 1-np.sum(ws**2)  # unbiased variance
-        # stds = np.sqrt(var)
+        std = numpy.std(particles, axis=0)
+        weighted_particles = [p*ws[i] for i, p in enumerate(particles)]
+
+        wmean = numpy.sum(weighted_particles, axis=0)
+        # wstd = numpy.std(weighted_particles, axis=0)
+
+        wdev = (wmean - particles).T**2
+        wvar = numpy.sum(ws * wdev, axis=1)  / 1-numpy.sum(ws**2)  # unbiased variance
+        wstd = numpy.sqrt(wvar)
+
+        # print(particles[:10])
+        # print(weighted_particles[:10])
+        # print(ws)
+
+        rospy.loginfo("Avg. PF mean: {}, std = {}".format(mean, std))
+        rospy.loginfo("Wght PF mean: {}, std = {}".format(wmean, wstd))
+        print(self.pf.mean_state)
+        print(self.pf.cov_state)
 
         # Publish UAV Pose
         uav_pos = PoseStamped()
