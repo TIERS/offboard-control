@@ -21,7 +21,7 @@ from mpl_toolkits.mplot3d       import Axes3D
 
 
 import sys
-sys.path.insert(1, '/home/xianjia/catkin_ws/src/offboard-control/scripts/utils')
+sys.path.insert(1, '/home/bot/iany_ws/src/offboard-control/scripts/utils')
 from utils import relative_position_from_four_meas
 
 
