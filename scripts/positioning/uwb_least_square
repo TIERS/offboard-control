@@ -1,0 +1,292 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import math
+import time
+import copy
+import rospy
+import numpy
+
+from std_msgs.msg       import String
+from std_msgs.msg       import Float64
+
+from nav_msgs.msg       import Odometry
+
+from sensor_msgs.msg    import Range
+
+from geometry_msgs.msg  import PoseStamped
+
+from mpl_toolkits.mplot3d       import Axes3D
+
+
+import sys
+sys.path.insert(1, '/home/bot/iany_ws/src/offboard-control/scripts/utils')
+from utils import relative_position_from_four_meas
+
+
+class UWBLeastSquare() :
+    '''
+        ROS Node that estimates position of a single or a set of UWB initiators
+        with respect to a set of responders in known positions. It uses a least square
+        method to estimate the position.
+    '''
+
+    def __init__(self) :
+        '''
+            TODO
+        '''
+
+        # Init node
+        rospy.init_node('UWB_Least_Square', anonymous=False)
+
+        # Responder positions
+        self.responder_offsets = numpy.array([
+            [0, 0, 0.23],
+            [0, 0.56, 0.23],
+            [0.56, 0.56, 0.23],
+            [0.56, 0, 0.23]
+        ])
+
+
+        self.pos = PoseStamped()
+        self.uav_uwb_pos = PoseStamped()
+        self.uav_uwb_pos_acc = [PoseStamped()]*2
+        self.ugv_uwb_pos = PoseStamped()
+        self.ugv_uwb_pos_acc = [PoseStamped()]*10
+
+        # Subscribe to MAVROS position
+        # self.odom = Odometry()
+        # self.vio_topic =  rospy.get_param("~uav_vio_topic", "/uav/t265/odom/sample")
+        # rospy.loginfo("Subscribing to odometry at {}".format(self.vio_topic))
+        # self.odom_sub = rospy.Subscriber(self.vio_topic, PoseStamped, self.update_odom_cb)
+
+        # Wait to get some odometry
+        # sys.stdout.write("Waiting for odom...")
+        # while not self.pos.header.stamp :
+        #     sys.stdout.write("..")
+        #     sys.stdout.flush()
+        #     time.sleep(0.1)
+        # self.home_pos = self.pos
+        # rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose.pose))
+
+        # Read VIO odom and calculate particle movement
+        self.last_particle_odom = Odometry()
+        self.particle_odom = numpy.zeros(2)
+
+        # Custom one-to-four and two-to-four UWB ranging
+        self.uwb_range_offset = rospy.get_param("~uwb_range_offset", 0.27)
+        self.custom_uwb_ranges = numpy.ones(4)
+        self.custom_uwb_stamps = [rospy.Time()] * 4
+
+        self.second_custom_uwb_ranges = numpy.ones(4)
+        self.second_custom_uwb_stamps = [rospy.Time()] * 4
+
+        self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
+        self.num_uwb_in_use = rospy.get_param("~num_of_custom_uwb", 4)
+        self.min_uwb_ranges = False     # At least 2 transceivers should be active...
+
+        self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.6)
+        self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
+        self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
+        self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
+
+        # UWB Callbacks
+        self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/O2A/distance", Float64, self.custom_uwbA_cb)
+        self.custom_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/O2B/distance", Float64, self.custom_uwbB_cb)
+        self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.custom_uwbC_cb)
+        self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.custom_uwbD_cb)
+
+        self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.second_uwbA_cb)
+        self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.second_uwbB_cb)
+        self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.second_uwbC_cb)
+        self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
+
+        # UWB Publishers
+        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
+        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
+        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/ls", PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/ls", PoseStamped, queue_size=10)
+
+    def update_odom_cb(self, pos) :
+        '''
+            Update odom from VIO
+        '''
+        self.pos = pos
+    
+    def custom_uwbA_cb(self, range) :
+        '''
+            Update range to custom UWB A
+        '''
+        self.custom_uwb_ranges[0] = range.data - self.uwb_range_offset
+        if self.custom_uwb_ranges[0] < 0 :
+            self.custom_uwb_ranges[0] = 0
+        self.custom_uwb_stamps[0] = rospy.Time.now()
+
+    def custom_uwbB_cb(self, range) :
+        '''
+            Update range to custom UWB B
+        '''
+        self.custom_uwb_ranges[1] = range.data - self.uwb_range_offset
+        if self.custom_uwb_ranges[1] < 0 :
+            self.custom_uwb_ranges[1] = 0
+        self.custom_uwb_stamps[1] = rospy.Time.now()
+
+    def custom_uwbC_cb(self, range) :
+        '''
+            Update range to custom UWB C
+        '''
+        self.custom_uwb_ranges[2] = range.data - self.uwb_range_offset
+        if self.custom_uwb_ranges[2] < 0 :
+            self.custom_uwb_ranges[2] = 0
+        self.custom_uwb_stamps[2] = rospy.Time.now()
+
+    def custom_uwbD_cb(self, range) :
+        '''
+            Update range to custom UWB D
+        '''
+        self.custom_uwb_ranges[3] = range.data - self.uwb_range_offset
+        if self.custom_uwb_ranges[3] < 0 :
+            self.custom_uwb_ranges[3] = 0
+        self.custom_uwb_stamps[3] = rospy.Time.now()
+
+    def second_uwbA_cb(self, range) :
+        '''
+            Update (second) range to custom UWB A
+        '''
+        self.second_custom_uwb_ranges[0] = range.data - self.uwb_range_offset
+        if self.second_custom_uwb_ranges[0] < 0 :
+            self.second_custom_uwb_ranges[0] = 0
+        self.second_custom_uwb_stamps[0] = rospy.Time.now()
+
+    def second_uwbB_cb(self, range) :
+        '''
+            Update (second) range to custom UWB B
+        '''
+        self.second_custom_uwb_ranges[1] = range.data - self.uwb_range_offset
+        if self.second_custom_uwb_ranges[1] < 0 :
+            self.second_custom_uwb_ranges[1] = 0
+        self.second_custom_uwb_stamps[1] = rospy.Time.now()
+
+    def second_uwbC_cb(self, range) :
+        '''
+            Update (second) range to custom UWB C
+        '''
+        self.second_custom_uwb_ranges[2] = range.data - self.uwb_range_offset
+        if self.second_custom_uwb_ranges[2] < 0 :
+            self.second_custom_uwb_ranges[2] = 0
+        self.second_custom_uwb_stamps[2] = rospy.Time.now()
+
+    def second_uwbD_cb(self, range) :
+        '''
+            Update (second) range to custom UWB D
+        '''
+        self.second_custom_uwb_ranges[3] = range.data - self.uwb_range_offset
+        if self.second_custom_uwb_ranges[3] < 0 :
+            self.second_custom_uwb_ranges[3] = 0
+        self.second_custom_uwb_stamps[3] = rospy.Time.now()
+    
+    def velocity(self, x) :
+        '''
+            Use VIO to update position
+        '''
+        xp = x + self.particle_odom
+        return xp
+
+
+    def calc_weights(self, hypotheses, observations, move=None, z = None) :
+        '''
+            Calculate particle weights based on error
+        '''
+        return squared_error(hypotheses, observations, sigma=self.weights_sigma)
+
+    def update_filter(self, target) :
+        pass
+
+    
+    def calculate_relative_pos_least_squares(self, target) :
+        '''
+            Calculates relative UGV-UAV positions.
+            Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
+            Uses least squares optimization.
+        '''
+        rospy.loginfo("calculation position ...")
+        ground_distances = self.custom_uwb_ranges[:3] * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.35) / self.custom_uwb_ranges[:3]) )
+        
+        if not self.uav_uwb_pos.header.stamp :
+            # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3])
+            rospy.logwarn("Cannot use previous UAV relative pos for LE search.")
+        else :
+            xlim = [self.uav_uwb_pos.pose.position.x - 1.2, self.uav_uwb_pos.pose.position.x + 1.2]
+            ylim = [self.uav_uwb_pos.pose.position.y - 1.2, self.uav_uwb_pos.pose.position.y + 1.2]
+            zlim = [self.pos.pose.position.z - 0.5, self.pos.pose.position.z]
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3], xlim, ylim, zlim)
+        
+        # Done estimating relative position
+        # rospy.loginfo("\rRelative position estimate: ({}) with error {} and distances {}".format(uav_pos, uav_err, self.custom_uwb_ranges))
+        sys.stdout.write("\rRelative position estimate: ({})   with error   {}".format(uav_pos, uav_err))
+        sys.stdout.flush()
+        self.rel_pos_error = uav_err
+
+        # "Fake" UGV pos (compared to DRTLS UWB)
+        self.ugv_uwb_pos = PoseStamped()
+        self.ugv_uwb_pos.header.stamp = rospy.Time.now()
+        self.ugv_uwb_pos.pose.position.x = self.ugv_xoffset
+        self.ugv_uwb_pos.pose.position.y = self.ugv_yoffset
+        self.ugv_uwb_pos.pose.position.z = 0
+        self.ugv_uwb_fake_publisher.publish(self.ugv_uwb_pos)
+
+        # "Fake" UAV pos (compared to DRTLS UWB)
+        self.uav_uwb_pos = PoseStamped()
+        self.uav_uwb_pos.header.stamp = rospy.Time.now()
+        self.uav_uwb_pos.pose.position.x = uav_pos[0]
+        self.uav_uwb_pos.pose.position.y = uav_pos[1]
+        self.uav_uwb_pos.pose.position.z = self.pos.pose.position.z
+        self.uav_uwb_fake_publisher.publish(self.uav_uwb_pos)
+
+        self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
+        self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
+        rospy.loginfo("ugv: {}".format(self.uav_uwb_pos.pose.position.x))
+
+
+    def run(self) :
+        '''
+            Create timer to update filter.
+        '''
+        
+        # Set position calculating timer at 6 Hz
+        time.sleep(1)
+        rospy_check_rate = rospy.Rate(10.0)
+        self.filter_timer = rospy.Timer(rospy.Duration(1.0/6), self.calculate_relative_pos_least_squares)
+        
+        # Start calculating relative positions
+        rospy.loginfo("Starting Least Square Position Calculation...")
+        try:
+
+            while not rospy.is_shutdown() :
+                # Update objective position and publish it               
+                rospy_check_rate.sleep()
+
+        except KeyboardInterrupt :
+            rospy.logerr('Keyboard Interrupt detected! Trying to land')
+
+        # Stop objective update timer and land
+        self.filter_timer.shutdown()
+
+
+if __name__ == '__main__':
+    '''
+        Run the node
+    '''
+
+    # Create new filter object
+    position_caculator = UWBLeastSquare()
+
+    try:
+        # Run the mission control
+        position_caculator.run()
+
+    except rospy.ROSInterruptException:
+        position_caculator.filter_timer.shutdown()
+        rospy.loginfo("UWB Least Square Position Calculation Stopped.")
