@@ -16,6 +16,7 @@ from nav_msgs.msg       import Odometry
 from sensor_msgs.msg    import Range
 
 from geometry_msgs.msg  import PoseStamped
+from geometry_msgs.msg  import PoseWithCovarianceStamped
 
 from pfilter            import ParticleFilter
 from pfilter            import squared_error
@@ -109,6 +110,16 @@ class UWBParticleFilter() :
         self.ugv_pos.pose.orientation.z = 0.0
         self.ugv_pos.pose.orientation.w = 1.0
 
+        self.pos = PoseWithCovarianceStamped()
+        self.pos.header.stamp = rospy.Time.now()
+        self.pos.pose.pose.position.x = 0
+        self.pos.pose.pose.position.y = 0
+        self.pos.pose.pose.position.z = 0
+        self.pos.pose.pose.orientation.x = 0.0
+        self.pos.pose.pose.orientation.y = 0.0
+        self.pos.pose.pose.orientation.z = 0.0
+        self.pos.pose.pose.orientation.w = 1.0
+
         self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
 
         # UWB Callbacks
@@ -126,6 +137,7 @@ class UWBParticleFilter() :
         self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
         self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
         self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/pf", PoseStamped, queue_size=10)
+        self.uav_uwb_fake_publisher_cov = rospy.Publisher(self.uav_uwb_topic+"/pf/cov", PoseWithCovarianceStamped, queue_size=10)
         self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/pf", PoseStamped, queue_size=10)
 
     def update_odom_cb(self, odom) :
@@ -270,39 +282,25 @@ class UWBParticleFilter() :
 
         self.pf.update(observed=new_meas, move=self.particle_odom, particles_z=particles_z)
 
-        particles = self.pf.transformed_particles
-        ws = numpy.array(self.pf.weights)
-        mean = numpy.mean(particles, axis=0)
-        std = numpy.std(particles, axis=0)
-        weighted_particles = [p*ws[i] for i, p in enumerate(particles)]
+        # rospy.loginfo("Avg. PF mean: {}, std = {}".format(self.pf.mean_state, self.pf.cov_state))
+        if self.pf.cov_state[0][0] > 0.5 or self.pf.cov_state[0][1] > 0.5 :
+            rospy.logwarn("PF covariance too high at {}".format(self.pf.cov_state))
 
-        wmean = numpy.sum(weighted_particles, axis=0)
-        # wstd = numpy.std(weighted_particles, axis=0)
-
-        wdev = (wmean - particles).T**2
-        wvar = numpy.sum(ws * wdev, axis=1)  / 1-numpy.sum(ws**2)  # unbiased variance
-        wstd = numpy.sqrt(wvar)
-
-        # print(particles[:10])
-        # print(weighted_particles[:10])
-        # print(ws)
-
-        rospy.loginfo("Avg. PF mean: {}, std = {}".format(mean, std))
-        rospy.loginfo("Wght PF mean: {}, std = {}".format(wmean, wstd))
-        print(self.pf.mean_state)
-        print(self.pf.cov_state)
-
-        # Publish UAV Pose
+        # Store to PoseWithCovarianceStamped
+        self.pos.pose.pose.position.x = self.pf.mean_state[0]
+        self.pos.pose.pose.position.y = self.pf.mean_state[1]
+        self.pos.pose.pose.position.z = self.odom.pose.pose.position.z
+        self.pos.pose.covariance[0] = self.pf.cov_state[0][0]
+        self.pos.pose.covariance[1] = self.pf.cov_state[0][1]
+        self.pos.pose.covariance[6] = self.pf.cov_state[1][0]
+        self.pos.pose.covariance[7] = self.pf.cov_state[1][1]
+        
+        # Publish with and without covariance
         uav_pos = PoseStamped()
-        uav_pos.header.stamp = rospy.Time.now()
-        uav_pos.pose.position.x = mean[0]
-        uav_pos.pose.position.y = mean[1]
-        uav_pos.pose.position.z = self.odom.pose.pose.position.z
-        uav_pos.pose.orientation.x = 0.0
-        uav_pos.pose.orientation.y = 0.0
-        uav_pos.pose.orientation.z = 0.0
-        uav_pos.pose.orientation.w = 1.0
+        uav_pos.header = self.pos.header
+        uav_pos.pose = self.pos.pose.pose
         self.uav_uwb_fake_publisher.publish(uav_pos)
+        self.uav_uwb_fake_publisher_cov.publish(self.pos)
 
         # Publish UGV Pose
         self.ugv_pos = PoseStamped()
