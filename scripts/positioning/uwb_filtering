@@ -53,6 +53,17 @@ class UWBParticleFilter() :
         self.uwb_noise = rospy.get_param("~uwb_noise", 0.15)
         self.resample_proportion = rospy.get_param("~resample_proportion", 0.01)
 
+        # Create filter
+        self.pf = ParticleFilter(
+            prior_fn =              self.prior_fn, 
+            observe_fn =            self.calc_dists,  
+            dynamics_fn =           self.velocity, #lambda x: x,
+            n_particles =           self.num_particles, 
+            noise_fn =              self.add_noise, #lambda x: x + np.random.normal(0, noise, x.shape),
+            weight_fn =             self.calc_weights, #lambda x, y : squared_error(x, y, sigma=2),
+            resample_proportion =   self.resample_proportion
+        )
+
         # Subscribe to MAVROS position
         self.odom = Odometry()
         self.vio_topic =  rospy.get_param("~uav_vio_topic", "/uav/t265/odom/sample")
@@ -88,6 +99,8 @@ class UWBParticleFilter() :
         self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
         self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
         self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
+
+        self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
 
         # UWB Callbacks
         self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/O2A/distance", Float64, self.custom_uwbA_cb)
@@ -184,14 +197,14 @@ class UWBParticleFilter() :
             self.second_custom_uwb_ranges[3] = 0
         self.second_custom_uwb_stamps[3] = rospy.Time.now()
     
-    def velocity(self, x) :
+    def velocity(self, x, move=None, particles_z=None) :
         '''
             Use VIO to update position
         '''
         xp = x + self.particle_odom
         return xp
 
-    def add_noise(self, x) :
+    def add_noise(self, x, move=None, particles_z=None) :
         '''
             Add noise to the estimations
             TODO add the noise to the measurements instead
@@ -199,20 +212,22 @@ class UWBParticleFilter() :
         xp = x + numpy.random.normal(0, self.uwb_noise, x.shape)
         return xp
 
-    def calc_dists(self, x) :
+    def calc_dists(self, x, move=None, particles_z=None) :
         '''
             Given (Nx2) matrix of positions,
             create N arrays each with the 4
             ranges that should be observed
             from the given positions
         '''
-        particles_z = numpy.ones((x.shape[0],1)) * self.odom.pose.pose.position.z
         x3d = numpy.append(x, particles_z, axis=1)
         
         y = numpy.zeros((x.shape[0], 4))
         for i, p in enumerate(x3d) :
             for j, q in enumerate(self.responder_offsets) :
-                y[i][j] = numpy.linalg.norm(p - q)
+                if self.custom_uwb_ranges[j] - rospy.Time.now() < self.max_pos_delay :
+                    y[i][j] = numpy.linalg.norm(p - q)
+                else :
+                    rospy.logwarn("Not using meas from range {} (old timestamp)".format(j))
 
         return y
 
@@ -223,23 +238,33 @@ class UWBParticleFilter() :
         return squared_error(hypotheses, observations, sigma=self.weights_sigma)
 
     def update_filter(self, target) :
-        pass
+        '''
+            Upadate particle filter
+        '''
+        # Get UWB ranges
+        new_meas = [
+            self.custom_uwb_ranges[i] if self.custom_uwb_stamps[1] - rospy.Time.now() < self.max_pos_delay
+            else -1
+            for i in range(4)
+        ]
+
+        # Calculate odom from last PF uptdate
+        self.particle_odom[0] = self.odom.pose.pose.position.x - self.last_particle_odom.pose.pose.position.x
+        self.particle_odom[1] = self.odom.pose.pose.position.y - self.last_particle_odom.pose.pose.position.y
+
+        # Get Zs
+        particles_z = numpy.ones((self.num_particles, 1)) * self.odom.pose.pose.position.z
+
+        self.pf.update(observed=y, move=self.particle_odom, particles_z=particles_z)
+
+        states = [self.pf.transformed_particles, np.array(self.pf.weights)]
 
     def run(self) :
         '''
             Create timer to update filter.
         '''
-
-        # Create filter
-        self.pf = ParticleFilter(
-            prior_fn =              self.prior_fn, 
-            observe_fn =            self.calc_dists,  
-            dynamics_fn =           self.velocity, #lambda x: x,
-            n_particles =           self.num_particles, 
-            noise_fn =              self.add_noise, #lambda x: x + np.random.normal(0, noise, x.shape),
-            weight_fn =             self.calc_weights, #lambda x, y : squared_error(x, y, sigma=2),
-            resample_proportion =   self.resample_proportion
-        )
+        # Reset filter
+        pf.init_filter()
 
         # Set filter update timer at 6 Hz
         time.sleep(1)
