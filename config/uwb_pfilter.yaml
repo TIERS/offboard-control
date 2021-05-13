@@ -3,3 +3,6 @@ num_particles :           400
 uwb_noise :               0.15
 resample_proportion :     0.01
 verbose:                  False
+
+uav_uwb_topic:            "/dwm1001/tag/dronie/position/pf"
+ugv_uwb_topic:            "/dwm1001/tag/dashgo/position/pf"

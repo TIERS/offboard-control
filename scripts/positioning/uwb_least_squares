@@ -93,16 +93,22 @@ class UWBLeastSquare() :
         self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
         self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
 
+        defualt_uwb_range_o2 = ["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]
+        defualt_uwb_range_p2 = ["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm1001/P2C/distance", "/dwm1001/P2D/distance"]
+        self.uwb_range_o2 = rospy.get_param("~uwb_range_o2", defualt_uwb_range_o2)
+        self.uwb_range_p2 = rospy.get_param("~uwb_range_p2", defualt_uwb_range_p2)
+ 
+        # rospy.loginfo("uwb: {}, {}".format(self.uwb_range_o2[0], self.uwb_range_o2[0]))
         # UWB Callbacks
-        self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/O2A/distance", Float64, self.custom_uwbA_cb)
-        self.custom_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/O2B/distance", Float64, self.custom_uwbB_cb)
-        self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.custom_uwbC_cb)
-        self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.custom_uwbD_cb)
+        self.custom_uwb_rangeA_sub = rospy.Subscriber(self.uwb_range_o2[0], Float64, self.custom_uwbA_cb)
+        self.custom_uwb_rangeB_sub = rospy.Subscriber(self.uwb_range_o2[1], Float64, self.custom_uwbB_cb)
+        self.custom_uwb_rangeC_sub = rospy.Subscriber(self.uwb_range_o2[2], Float64, self.custom_uwbC_cb)
+        self.custom_uwb_rangeD_sub = rospy.Subscriber(self.uwb_range_o2[3], Float64, self.custom_uwbD_cb)
 
-        self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/P2A/distance", Float64, self.second_uwbA_cb)
-        self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/P2B/distance", Float64, self.second_uwbB_cb)
-        self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/P2C/distance", Float64, self.second_uwbC_cb)
-        self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
+        self.second_uwb_rangeA_sub = rospy.Subscriber(self.uwb_range_p2[0], Float64, self.second_uwbA_cb)
+        self.second_uwb_rangeB_sub = rospy.Subscriber(self.uwb_range_p2[1], Float64, self.second_uwbB_cb)
+        self.second_uwb_rangeC_sub = rospy.Subscriber(self.uwb_range_p2[2], Float64, self.second_uwbC_cb)
+        self.second_uwb_rangeD_sub = rospy.Subscriber(self.uwb_range_p2[3], Float64, self.second_uwbD_cb)
 
         # UWB Publishers
         self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position/ls")
