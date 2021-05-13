@@ -21,7 +21,7 @@ from mpl_toolkits.mplot3d       import Axes3D
 
 
 
-class UWBMultiLateral():
+class UWBMultiLateration():
     '''
         ROS Node that estimates position of a single or a set of UWB initiators
         with respect to a set of responders in known positions. It uses a triangular method
@@ -30,11 +30,11 @@ class UWBMultiLateral():
 
     def __init__(self) :
         '''
-            TODO
+            TODO Docstring
         '''
 
         # Init node
-        rospy.init_node('UWB_Multilateral', anonymous=False)
+        rospy.init_node('UWB_Multilateration', anonymous=False)
 
         # Responder positions
         self.responder_offsets = numpy.array([
@@ -49,25 +49,6 @@ class UWBMultiLateral():
         self.uav_uwb_pos_acc = [PoseStamped()]*2
         self.ugv_uwb_pos = PoseStamped()
         self.ugv_uwb_pos_acc = [PoseStamped()]*10
-
-        # # Subscribe to MAVROS position
-        # self.odom = Odometry()
-        # self.vio_topic =  rospy.get_param("~uav_vio_topic", "/uav/t265/odom/sample")
-        # rospy.loginfo("Subscribing to odometry at {}".format(self.vio_topic))
-        # self.odom_sub = rospy.Subscriber(self.vio_topic, PoseStamped, self.update_odom)
-
-        # # Wait to get some odometry
-        # sys.stdout.write("Waiting for odom...")
-        # while not self.pos.header.stamp :
-        #     sys.stdout.write("..")
-        #     sys.stdout.flush()
-        #     time.sleep(0.1)
-        # self.home_pos = self.pos
-        # rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose.pose))
-
-        # Read VIO odom and calculate particle movement
-        self.last_particle_odom = Odometry()
-        self.particle_odom = numpy.zeros(2)
 
         # Custom one-to-four and two-to-four UWB ranging
         self.uwb_range_offset = rospy.get_param("~uwb_range_offset", 0.27)
@@ -117,17 +98,14 @@ class UWBMultiLateral():
         self.second_uwb_rangeD_sub = rospy.Subscriber(self.uwb_range_p2[3], Float64, self.second_uwbD_cb)
 
         # UWB Publishers
-        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
-        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
-        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic, PoseStamped, queue_size=10)
-        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic, PoseStamped, queue_size=10)
+        uav_uwb_pos_publish_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
+        ugv_uwb_pos_publish_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
+        uwb_topic_suffix = rospy.get_param("~uwb_topic_suffix_mlat", "/mlat")
+        
+        self.uav_uwb_fake_publisher = rospy.Publisher(uav_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(ugv_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
 
-    def update_odom_cb(self, pos) :
-        '''
-            Update odom from VIO
-        '''
-        self.pos = pos
-    
+
     def custom_uwbA_cb(self, range) :
         '''
             Update range to custom UWB A
@@ -314,7 +292,7 @@ if __name__ == '__main__':
     '''
 
     # Create new position calculator
-    position_calculator = UWBMultiLateral()
+    position_calculator = UWBMultiLateration()
 
     try:
         # Run the mission control

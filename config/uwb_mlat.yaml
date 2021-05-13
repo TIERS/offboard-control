@@ -1,6 +1,3 @@
-max_pos_delay:        0.2
-
-
-# UWB Publishers
-uav_uwb_topic:        "/dwm1001/tag/dronie/position/mlat"
-ugv_uwb_topic:        "/dwm1001/tag/dashgo/position/mlat"
+max_pos_delay:          0.2
+verbose:                False
+uwb_topic_suffix_mlat:  "/mlat"
