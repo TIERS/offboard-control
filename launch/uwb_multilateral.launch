@@ -1,5 +1,0 @@
-<launch>
-    <node name="uwb_multilateral" pkg="offboard_control" type="uwb_multilateral" respawn="true" output="screen">
-        <rosparam file="$(find offboard_control)/config/uwb_multilateral.yaml" command="load"/>
-    </node>
-</launch>

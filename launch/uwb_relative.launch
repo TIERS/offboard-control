@@ -1,8 +1,0 @@
-<launch>
-
-    <node name="DWM1001_Relative" pkg="offboard_control" type="uwb_one_to_four" respawn="true" output="screen">
-        <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
-        <param name="verbose" value="False" />
-    </node>
-
-</launch>
