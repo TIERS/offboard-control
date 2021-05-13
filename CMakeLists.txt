@@ -16,6 +16,9 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   message_generation
+  # PCL
+  sensor_msgs 
+  pcl_ros
 )
 
 ## System dependencies are found with CMake's conventions
@@ -110,7 +113,7 @@ generate_messages(
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES offboard_control
- CATKIN_DEPENDS message_runtime
+ CATKIN_DEPENDS message_runtime sensor_msgs pcl_ros
 #  LIBRARIES offboard-control
 #  CATKIN_DEPENDS geometry_msgs mavros mavros_msgs roscpp rospy std_msgs
 #  DEPENDS system_lib
@@ -129,6 +132,10 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
 )
+
+include_directories(${PCL_INCLUDE_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 
 ## Declare a C++ library
 # add_library(position_to_mavros
@@ -150,6 +157,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(position_to_mavros_node src/position_to_mavros.cpp)
 add_executable(safe_offboard_node src/safe_offboard.cpp)
+add_executable(pc_filter_node src/pc_filter.cpp)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -179,6 +187,11 @@ target_link_libraries(safe_offboard_node
   # position_to_mavros
   # safe_offboard
   # ${YAMLCPP_LIBRARIES}
+)
+
+target_link_libraries(pc_filter_node
+  ${catkin_LIBRARIES}
+  ${PCL_LIBS}
 )
 
 

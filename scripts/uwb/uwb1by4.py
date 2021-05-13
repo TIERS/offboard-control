@@ -1,13 +1,7 @@
 #!/usr/bin/env python
-""" For more info on the documentation go to https://www.decawave.com/sites/default/files/dwm1001-api-guide.pdf
+""" 
+    For more info on the documentation go to https://www.decawave.com/sites/default/files/dwm1001-api-guide.pdf
 """
-
-__author__     = "Jorge Pena Queralta; Qingqing Li  "
-__version__    = "0.1"
-__maintainer__ = "Jorge Pena Queralta"
-__email__      = "jopequ@utu.fi, qingqli@utu.fi"
-__status__     = "Development"
-
 
 import rospy, time, serial, os, sys, random
 
@@ -32,8 +26,8 @@ class dwm1001_localizer:
         rospy.init_node('DWM1001_Active_{}'.format(random.randint(0,100000)), anonymous=False)
 
         # Get port and tag name
-        self.dwm_port = rospy.get_param('~port')
-        self.tag_name = rospy.get_param('~tag_name')
+        self.dwm_port = rospy.get_param('~port', '/dev/ttyACM0')
+        self.tag_name = rospy.get_param('~tag_name', "1by4")
         self.network = rospy.get_param('~network', "default")
         self.verbose = rospy.get_param('~verbose', False)
         
@@ -78,6 +72,7 @@ class dwm1001_localizer:
             while not rospy.is_shutdown():
                 # just read everything from serial port
                 serialReadLine = self.serialPortDWM1001.read_until() 
+                # print(serialReadLine)
                 # try:
                 self.publishTagPositions(serialReadLine)
 
@@ -95,47 +90,48 @@ class dwm1001_localizer:
         :returns: none
         """
   
-        arrayData = [x  for x in serialData.strip().split(' ')]
-        print(" Input : ", arrayData, "  length: ", len(arrayData))
+        arrayData = [x  for x in serialData.strip().split(' ')] 
+        if self.verbose :
+            print(" Input : ", arrayData, "  length: ", len(arrayData))
 
-        if(len(arrayData) is not 5): 
+        if(len(arrayData) is not 4):
+            rospy.logwarn("Wrong length!")
             return
-
-        print(arrayData)
-
+ 
         node_id = arrayData[1]
         first_time = False
         if node_id not in self.topics :
             print("NodeID: ", node_id)
             tag_name = ""
-            if node_id == '65':
+            if node_id == 'A':
                 tag_name = "tag_A"
-            elif node_id == '66':
+            elif node_id == 'B':
                 tag_name = "tag_B"
-            elif node_id == '67':
+            elif node_id == 'C':
                 tag_name = "tag_C"
-            elif node_id == '68':
+            elif node_id == 'D':
                 tag_name = "tag_D"
-                print("Tag Name is ", tag_name)
+                
             else:
-                print("WRONG INFO; Return !")
-                return;
-
+                rospy.logwarn("WRONG NODE ID; Return !")
+                return 
+            
             first_time = True
 
             self.topics[node_id] = rospy.Publisher('/dwm1001/'+tag_name + "/distance", Float64, queue_size=100)
 
         try :
-            dist = float(arrayData[4])
-            print("Publish distance topic : ", dist)
+            dist = float(arrayData[3])
+            if self.verbose :
+                print("Publish distance topic : ", dist)
             self.topics[node_id].publish(dist)
         except :
-            pass
+            rospy.logwarn("WRONG DISTANCE data!")
 
 if __name__ == '__main__':
     try:
         dwm1001 = dwm1001_localizer()
         dwm1001.main()
-        #rospy.spin()
+        # rospy.spin()
     except rospy.ROSInterruptException:
         pass

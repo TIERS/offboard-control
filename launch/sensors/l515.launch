@@ -1,0 +1,18 @@
+<launch>
+
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"     value="l515" />
+    <arg name="serial_no"  value="f0231910" /> 
+    <arg name="filters"    value="pointcloud" />
+    <arg name="pointcloud_texture_stream" default="RS2_STREAM_ANY"/>
+    <arg name="enable_pointcloud"         default="true"/>
+    <arg name="enable_color"        default="true"/>
+    <arg name="enable_depth"        default="true"/>
+    <arg name="enable_infra2"        default="false"/>
+    <arg name="enable_infra1"        default="false"/>
+    <arg name="align_depth"         default="true"/>
+    <arg name="depth_width"         default="640"/>
+    <arg name="depth_height"        default="480"/>
+  </include>          
+
+</launch>

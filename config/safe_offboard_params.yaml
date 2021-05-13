@@ -1,7 +1,22 @@
-fly_time: 40
-flight_mode: "stay"
-takeoff_height: 1.0
-circle_radius: 0.6
-pos_valid_time: 1.0
-waypoint_valid_time: 1.0
-fly_fence: [-1.5, -3.5, 0.0, 1.5, 1.5, 1.5]
+mavros_state_sub_topic:       "mavros/state"
+mavros_position_sub_topic:    "mavros/vision_pose/pose"
+external_waypoint_sub_topic:  "offboard/command_waypoint"
+waypoint_pub_topic:           "mavros/setpoint_position/local"
+offboard_state_pub_topic:     "offboard/state"
+flight_mode_pub_topic:        "offboard/mode"
+arming_client_topic:          "mavros/cmd/arming"
+landing_client_topic:         "mavros/cmd/land"
+mavros_set_mode_client_topic: "mavros/set_mode"
+emergency_land_server_topic:  "offboard/emergency_land"
+flight_mode_sub_topic:        "offboard/mode/change"
+flight_mode_srv_topic:        "offboard/cmd/mode"
+offboard_state_srv_topic:     "offboard/cmd/state"
+
+fly_time:             40
+flight_mode:          "stay"
+takeoff_height:       1.0
+circle_radius:        0.6
+square_side:          2
+pos_valid_time:       1.0
+waypoint_valid_time:  1.0
+fly_fence:            [-2.5, -3.5, 0.0, 1, 4, 1.9]

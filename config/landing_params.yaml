@@ -1,19 +1,55 @@
-uav_uwb_topic:        "/dwm1001/tag/dronie/position"
-ugv_uwb_topic:        "/dwm1001/tag/ugv/position"
+uav_uwb_topic:          "/dwm1001/tag/dronie/position"
+ugv_uwb_topic:          "/dwm1001/tag/ugv/position"
 
-local_pos_topic:      "mavros/local_position/pose"
-waypoint_pub_topic:   "offboard/command_waypoint"
-offboard_mode_topic:  "offboard/mode"
+ugv_vio_topic:          "/ugv/t265/odom/sample_throttled"
+uav_vio_topic:          "/uav/t265/odom/sample"
 
-dist_to_target_topic: "landing/distance"
+local_pos_topic:        "mavros/local_position/pose"
+waypoint_pub_topic:     "offboard/command_waypoint"
+change_mode_topic:      "offboard/mode/change"
+offboard_state_topic:   "offboard/state"
+offboard_mode_topic:    "offboard/mode"
 
-max_pos_delay:        0.6
+dist_to_target_topic:   "landing/distance"
+landing_done_topic:     "landing/completed"
 
-waypoint_step:        0.2
+four_matrix_topic:      "/uwb/matrix/distances"
+single_range_topic:     "uwb/range"
 
-approaching_altitude: 1.2
-closing_altitude:     0.8
-landing_altitude:     0.45
+max_pos_delay:          1.2
 
-closing_dist:         1.5
-landing_dist:         0.1
+waypoint_step:          0.3
+
+approaching_altitude:   1.7
+closing_altitude:       1.5
+landing_altitude:       1.3
+done_altitude:          0.6
+
+closing_dist:           1.5
+landing_dist:           0.8
+landing_stop_dist:      0.04
+
+min_accumulated_meas:   20
+min_intermeas_dist:     0.2
+
+max_landing_trials :    2
+min_landing_stay:       8
+min_home_stay:          2
+
+custom_uwb_xsep:        0.56
+custom_uwb_ysep:        0.56
+custom_uwb_xoffset:     0.28
+custom_uwb_yoffset:     0.28
+
+using_custom_uwb:       True
+num_of_custom_uwb:      4
+
+clone_ugv_orientation:  False
+
+using_4x4_uwb:          False
+land_while_ugv_moves:   False
+
+using_multilateration:  True
+using_optimization:     False
+
+landing_activated:      True

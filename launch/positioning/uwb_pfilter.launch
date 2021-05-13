@@ -1,0 +1,6 @@
+<launch>
+    <node name="uwb_filtering" pkg="offboard_control" type="uwb_filtering" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
+        <rosparam file="$(find offboard_control)/config/uwb_pfilter.yaml" command="load"/>
+    </node>
+</launch>

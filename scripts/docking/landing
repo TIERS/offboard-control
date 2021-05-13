@@ -1,0 +1,806 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import math
+import time
+import copy
+import rospy
+import numpy
+
+from std_msgs.msg       import String
+from std_msgs.msg       import Float64
+
+from nav_msgs.msg       import Odometry
+
+from sensor_msgs.msg    import Range
+
+from geometry_msgs.msg  import PoseStamped
+
+from offboard_control.srv  import flight_mode as OffMode
+
+from utils import relative_position_from_four_meas
+
+
+
+class LandingControl() :
+    '''
+        TODO Docstring
+    '''
+
+    def __init__(self) :
+        '''
+            Test node to land a UAV on a UGV based on UWB ranging.
+            Landing options:
+                - Use external UWB anchors to position both vehicles
+                - Use single UAV-UGV range measurement + VIO on both vehicles
+                - Use multiple UWB transceivers on UGV to estimate relative positions
+                - Use multiple UWB transceivers on both UGV and UAV to estimate relative poses
+        '''
+
+        # Init node
+        rospy.init_node('UWB_VIO_Landing', anonymous=False)
+
+        # Positions for navigation
+        self.pos = PoseStamped()
+        self.uav_uwb_pos = PoseStamped()
+        self.uav_uwb_pos_acc = [PoseStamped()]*2
+        self.ugv_uwb_pos = PoseStamped()
+        self.ugv_uwb_pos_acc = [PoseStamped()]*10
+        self.objective = PoseStamped()
+        
+        self.landing_cnt = 0
+        self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
+        self.waypoint_step = rospy.get_param("~waypoint_step", 0.2)
+
+        # Attributes for multiple landing tests
+        self.landing_done_time = None
+        self.going_back_home = False
+        self.dist_to_home = -1
+        self.arrived_home_time = None
+        self.land_and_back_trip_count = 1
+        self.mission_completed = False
+        self.max_landing_trials = rospy.get_param("~max_landing_trials", 2)
+        self.min_landing_stationary_duration = rospy.get_param("~min_landing_stay", 2.0)
+        self.min_home_stationary_duration = rospy.get_param("~min_home_stay", 2.0)
+
+        # Control altitudes
+        self.approaching_altitude = rospy.get_param("~approaching_altitude", 1.2)
+        self.closing_altitude = rospy.get_param("~closing_altitude", 0.8)
+        self.landing_altitude = rospy.get_param("~landing_altitude", 1.2)
+
+        self.closing_dist = rospy.get_param("~closing_dist", 1)
+        self.landing_dist = rospy.get_param("~landing_dist", 0.1)
+        self.landing_stop_dist = rospy.get_param("~landing_stop_dist", 0.05)
+
+        self.landing_done = False
+        self.pose_when_landing = PoseStamped()
+
+        # Publish when landing completed
+        self.landing_done_topic = rospy.get_param("~landing_done_topic", "landing/completed")
+        self.landing_done_pub = rospy.Publisher(self.landing_done_topic, String, queue_size=10)
+
+        # Publish distance to target in a topic
+        self.dist_to_target_topic = rospy.get_param("~dist_to_target_topic", "landing/distance")
+        self.dist_to_target = -1
+        self.dist_to_target_pub = rospy.Publisher(self.dist_to_target_topic, Range, queue_size=10)
+
+        # Get pos from PX4 EKF2 that already integrates VIO and/or others
+        self.local_pos_topic =  rospy.get_param("~local_pos_topic", "/uav/mavros/local_position/pose")
+        rospy.loginfo("Subscribing to local (mavros) position at {}".format(self.local_pos_topic))
+
+        self.local_pos_sub = rospy.Subscriber(self.local_pos_topic, PoseStamped, self.update_current_pos_cb)
+
+        # Wait to get local pos lock
+        sys.stdout.write("Waiting for (mavros) local pos lock...")
+        while not self.pos.header.stamp :
+            sys.stdout.write("..")
+            sys.stdout.flush()
+            time.sleep(0.1)
+        self.home_pos = self.pos
+        rospy.loginfo("Home position locked: \n{}".format(self.pos.pose))
+
+        # UWB Subscribers
+        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
+        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
+        rospy.loginfo("Subscribing to UAV UWB at {}".format(self.uav_uwb_topic))
+        rospy.loginfo("Subscribing to UGV UWB at {}".format(self.ugv_uwb_topic))
+
+        self.uav_uwb_subscriber = rospy.Subscriber(self.uav_uwb_topic, PoseStamped, self.uav_uwb_cb)
+        self.ugv_uwb_subscriber = rospy.Subscriber(self.ugv_uwb_topic, PoseStamped, self.ugv_uwb_cb)
+
+        # Fake UWB pos publishers 
+        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/fake", PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/fake", PoseStamped, queue_size=10)
+        self.uav_uwb_rel_error_publisher = rospy.Publisher(self.uav_uwb_topic+"/fake/error", Float64, queue_size=10)
+        self.rel_pos_error = -1
+
+        # UGV VIO pose (lower freq)
+        self.ugv_vio_pos = Odometry()
+        self.ugv_vio_topic = rospy.get_param("~ugv_vio_topic", "/ugv/t265/odom/sample")
+        rospy.loginfo("Subscribing to UGV VIO odometry at {}".format(self.ugv_vio_topic))
+        self.uav_vio_topic = rospy.get_param("~uav_vio_topic", "/uav/t265/odom/sample")
+        rospy.loginfo("Subscribing to UAV VIO odometry at {}".format(self.uav_vio_topic))
+
+        self.ugv_vio_subscriber = rospy.Subscriber(self.ugv_vio_topic, Odometry, self.ugv_vio_cb)
+        self.uav_vio_subscriber = rospy.Subscriber(self.uav_vio_topic, Odometry, self.uav_vio_cb)
+
+        # Publisher for actual control
+        self.publishing_objective = False
+        self.waypoint_pub_topic = rospy.get_param("~waypoint_pub_topic", "/dwm1001/tag/dronie/position")
+        self.control_pub = rospy.Publisher(self.waypoint_pub_topic, PoseStamped, queue_size=10)
+        
+        # Keep track of offboard state
+        self.offboard_state = String()
+        self.offboard_state_topic = rospy.get_param("~offboard_state_topic", "offboard/state")
+        rospy.loginfo("Subscribing to offboard state at {}".format(self.offboard_state_topic))
+
+        self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
+
+        # Service for changing to external offboard mode
+        self.pub_state_mode = rospy.Publisher("/uav/offboard/mode/change", String, queue_size=10)
+        self.set_ofboard_mode_client  = rospy.ServiceProxy("/uav/offboard/cmd/mode", OffMode)
+
+        # 1D lidar (height)
+        self.lidarz = 0.3
+        self.lidar_topic = rospy.get_param("~lidar_topic", "/uav/tfmini_ros_node/range")
+        self.lidar_subscriber = rospy.Subscriber(self.lidar_topic, Range, self.lidar_cb)
+
+        # Single ranging subscriber
+        self.single_uwb_range = -1
+        self.single_range_topic = rospy.get_param("~single_uwb_range_topic", "/uwb/range")
+        self.uwb_single_range_sub = rospy.Subscriber(self.single_range_topic, Float64, self.single_uwb_range_cb)
+
+        # Four-by-four matrix ranging
+        self.ranging_matrix = None
+        self.ranging_matrix_topic = rospy.get_param("~four_matrix_topic", "/uwb/matrix/distances")
+        self.ranging_matrix_sub = rospy.Subscriber(self.ranging_matrix_topic, String, self.ranging_matrix_cb)
+
+        # Custom one-to-four UWB ranging
+        self.custom_uwb_ranges = numpy.ones(4)
+        self.custom_uwb_stamps = [rospy.Time()] * 4
+
+        self.second_custom_uwb_ranges = numpy.ones(4)
+        self.second_custom_uwb_stamps = [rospy.Time()] * 4
+
+        self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
+        self.num_uwb_in_use = rospy.get_param("~num_of_custom_uwb", 4)
+        self.min_uwb_ranges = False     # At least 2 transceivers should be active...
+        self.land_while_ugv_is_moving = True#rospy.get_param("~land_while_ugv_moves", False)
+        self.ugv_vio_pos_when_landed = None
+
+        self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.6)
+        self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
+        self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
+        self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
+        
+        # Ranging subscribers
+        # self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/tag_A/distance", Float64, self.custom_uwbA_cb)
+        # self.custom_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/tag_B/distance", Float64, self.custom_uwbB_cb)
+        # self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/tag_C/distance", Float64, self.custom_uwbC_cb)
+        # self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/tag_D/distance", Float64, self.custom_uwbD_cb)
+
+        self.custom_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/O2A/distance", Float64, self.custom_uwbA_cb)
+        self.custom_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/O2B/distance", Float64, self.custom_uwbB_cb)
+        self.custom_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.custom_uwbC_cb)
+        self.custom_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.custom_uwbD_cb)
+
+        self.second_uwb_rangeA_sub = rospy.Subscriber("/dwm1001/O2A/distance", Float64, self.second_uwbA_cb)
+        self.second_uwb_rangeB_sub = rospy.Subscriber("/dwm1001/O2B/distance", Float64, self.second_uwbB_cb)
+        self.second_uwb_rangeC_sub = rospy.Subscriber("/dwm1001/O2C/distance", Float64, self.second_uwbC_cb)
+        self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/O2D/distance", Float64, self.second_uwbD_cb)
+
+        self.clone_ugv_orientation = rospy.get_param("~clone_ugv_orientation", False)
+
+        # UWB pairs to calculate relative pos and average
+        # 3rd element means x is calculated with cos (+1) or sin (-1)
+        # 4th, 5th elements have to be added to x,y respectively
+        # 6th element is the third side of the triangle to estimate angle
+        self.uwb_pairs = [
+            [0, 3, 1, 0, 0, self.ugv_x0],
+            [1, 2, 1, 0, self.ugv_y0, self.ugv_x0],
+            [0, 1, -1, 0, 0, self.ugv_y0],
+            [3, 2, -1, self.ugv_x0, 0, self.ugv_y0]
+        ]
+
+        # Relative position estimation
+        self.using_multilateration = rospy.get_param("~using_multilateration", False)
+        self.using_optimization = rospy.get_param("~using_optimization", False)
+
+        # Landing state publisher
+        self.landing_state = "waiting"
+        self.landing_state_pub = rospy.Publisher("/uav/landing/state", String, queue_size=10)
+        self.landing_state_num_pub = rospy.Publisher("/uav/landing/state/id", Float64, queue_size=10)
+        self.landing_state_dict = {
+            "waiting" : 0.0,
+            "approaching" : 1.0,
+            "closing_in" : 2.0,
+            "landing" : 3.0,
+            "landing_counting" : 4.0,
+            "landing_done" : 6.0,
+            "going_back" : 5.0
+        }
+
+        self.activated = rospy.get_param("~landing_activated", False)
+
+    def update_current_pos_cb(self, pos) :
+        '''
+            Update position from mavros local pose (callback)
+        '''
+        self.pos = pos
+
+    def uav_uwb_cb(self, pos) :
+        '''
+            Update UAV UWB position (callback)
+        '''
+        self.uav_uwb_pos = pos
+        self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(pos)
+        
+    def ugv_uwb_cb(self, pos) :
+        '''
+            Update UGV UWB position (callback)
+        '''
+        self.ugv_uwb_pos = pos
+        self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(pos)
+
+    def update_offboard_state_cb(self, state) :
+        '''
+            Update offboard state (callback)
+        '''
+        self.offboard_state = state.data
+
+    def ugv_vio_cb(self, odom) :
+        '''
+            Update UGV VIO odom (callback)
+        '''
+        self.ugv_vio_pos = odom
+
+    def uav_vio_cb(self, odom) :
+        '''
+            Update UAV VIO odom (callback)
+        '''
+        self.uav_vio_pos = odom
+
+    def single_uwb_range_cb(self, range) :
+        '''
+            Update single UGV-UAV UWB ranging measurement
+        '''
+        self.single_uwb_range = range
+
+    def ranging_matrix_cb(self, matrix) :
+        '''
+            Update 4by4 ranging matrix
+            TODO extract data to actual matrix
+        '''
+        self.ranging_matrix = matrix.data
+
+    def custom_uwbA_cb(self, range) :
+        '''
+            Update range to custom UWB A
+        '''
+        self.custom_uwb_ranges[0] = range.data - 0.27
+        if self.custom_uwb_ranges[0] < 0 :
+            self.custom_uwb_ranges[0] = 0
+        self.custom_uwb_stamps[0] = rospy.Time.now()
+
+    def custom_uwbB_cb(self, range) :
+        '''
+            Update range to custom UWB B
+        '''
+        self.custom_uwb_ranges[1] = range.data - 0.27
+        if self.custom_uwb_ranges[1] < 0 :
+            self.custom_uwb_ranges[1] = 0
+        self.custom_uwb_stamps[1] = rospy.Time.now()
+
+    def custom_uwbC_cb(self, range) :
+        '''
+            Update range to custom UWB C
+        '''
+        self.custom_uwb_ranges[2] = range.data - 0.27
+        if self.custom_uwb_ranges[2] < 0 :
+            self.custom_uwb_ranges[2] = 0
+        self.custom_uwb_stamps[2] = rospy.Time.now()
+
+    def custom_uwbD_cb(self, range) :
+        '''
+            Update range to custom UWB D
+        '''
+        self.custom_uwb_ranges[3] = range.data - 0.27
+        if self.custom_uwb_ranges[3] < 0 :
+            self.custom_uwb_ranges[3] = 0
+        self.custom_uwb_stamps[3] = rospy.Time.now()
+
+    def second_uwbA_cb(self, range) :
+        '''
+            Update range to custom UWB A
+        '''
+        self.second_custom_uwb_ranges[0] = range.data - 0.27
+        if self.second_custom_uwb_ranges[0] < 0 :
+            self.second_custom_uwb_ranges[0] = 0
+        self.second_custom_uwb_stamps[0] = rospy.Time.now()
+
+    def second_uwbB_cb(self, range) :
+        '''
+            Update range to custom UWB B
+        '''
+        self.second_custom_uwb_ranges[1] = range.data - 0.27
+        if self.second_custom_uwb_ranges[1] < 0 :
+            self.second_custom_uwb_ranges[1] = 0
+        self.second_custom_uwb_stamps[1] = rospy.Time.now()
+
+    def second_uwbC_cb(self, range) :
+        '''
+            Update range to custom UWB C
+        '''
+        self.second_custom_uwb_ranges[2] = range.data - 0.27
+        if self.second_custom_uwb_ranges[2] < 0 :
+            self.second_custom_uwb_ranges[2] = 0
+        self.second_custom_uwb_stamps[2] = rospy.Time.now()
+
+    def second_uwbD_cb(self, range) :
+        '''
+            Update range to custom UWB D
+        '''
+        self.second_custom_uwb_ranges[3] = range.data - 0.27
+        if self.second_custom_uwb_ranges[3] < 0 :
+            self.second_custom_uwb_ranges[3] = 0
+        self.second_custom_uwb_stamps[3] = rospy.Time.now()
+
+    def lidar_cb(self, range) :
+        '''
+            Update ground truth position
+        '''
+        self.lidarz = range.range
+
+    def check_min_uwb_ranges(self) :
+        '''
+            Checks at least two (usable) ranges are available
+        '''
+        cnt = 0
+        diffs = [rospy.Time.now() - stamp for stamp in self.custom_uwb_stamps]
+        for pair in self.uwb_pairs :
+            if diffs[pair[0]] < rospy.Duration(self.max_pos_delay) and diffs[pair[1]] < rospy.Duration(self.max_pos_delay) :
+                cnt += 1
+        if cnt > 0 :
+            self.min_uwb_ranges = True
+        else :
+            self.min_uwb_ranges = False
+
+    def calculate_drone_locate_area(self):
+        '''
+            Calculates where the drone locate of the tage, top-right, top-left, bottom-right, bottom-left
+        '''
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[1] and self.custom_uwb_ranges[1] > abs(self.ugv_y0))  \
+           or (self.custom_uwb_ranges[3] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_y0)): 
+            y = -1
+        else:
+            y = 1
+        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[3] and self.custom_uwb_ranges[3] > abs(self.ugv_x0))  \
+           or (self.custom_uwb_ranges[1] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_x0)): 
+            x = -1
+        else:
+            x = 1
+        return (x, y)
+    
+    def calculate_relative_pos_least_squares(self) :
+        '''
+            Calculates relative UGV-UAV positions.
+            Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
+            Uses least squares optimization.
+        '''
+        ground_distances = self.custom_uwb_ranges[:3] * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.35) / self.custom_uwb_ranges[:3]) )
+        
+        if not self.uav_uwb_pos.header.stamp :
+            # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3])
+            rospy.logwarn("Cannot use previous UAV relative pos for LE search.")
+        else :
+            xlim = [self.uav_uwb_pos.pose.position.x - 1.2, self.uav_uwb_pos.pose.position.x + 1.2]
+            ylim = [self.uav_uwb_pos.pose.position.y - 1.2, self.uav_uwb_pos.pose.position.y + 1.2]
+            zlim = [self.pos.pose.position.z - 0.5, self.pos.pose.position.z]
+            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3], xlim, ylim, zlim)
+        
+        # Done estimating relative position
+        # rospy.loginfo("\rRelative position estimate: ({}) with error {} and distances {}".format(uav_pos, uav_err, self.custom_uwb_ranges))
+        sys.stdout.write("\rRelative position estimate: ({})   with error   {}".format(uav_pos, uav_err))
+        sys.stdout.flush()
+        self.rel_pos_error = uav_err
+
+        # "Fake" UGV pos (compared to DRTLS UWB)
+        self.ugv_uwb_pos = PoseStamped()
+        self.ugv_uwb_pos.header.stamp = rospy.Time.now()
+        self.ugv_uwb_pos.pose.position.x = self.ugv_xoffset
+        self.ugv_uwb_pos.pose.position.y = self.ugv_yoffset
+        self.ugv_uwb_pos.pose.position.z = 0
+
+        # "Fake" UAV pos (compared to DRTLS UWB)
+        self.uav_uwb_pos = PoseStamped()
+        self.uav_uwb_pos.header.stamp = rospy.Time.now()
+        self.uav_uwb_pos.pose.position.x = uav_pos[0]
+        self.uav_uwb_pos.pose.position.y = uav_pos[1]
+        self.uav_uwb_pos.pose.position.z = self.pos.pose.position.z
+
+        self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
+        self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
+
+    def calculate_relative_uwb_poses(self) :
+        '''
+            Calculates relative UGV-UAV position based on 2-4 transceivers on the UGV
+        '''
+
+        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.07) / self.custom_uwb_ranges) )
+
+        est_cnt = 0 # Count how many pairs of transceivers we use to average estimation
+        est_x = 0
+        est_y = 0
+
+        # UWB pairs to calculate relative pos and average
+        # 3rd element means x is calculated with cos (+1) or sin (-1)
+        # 4th, 5th elements have to be added to x,y respectively (offsets)
+        # 6th element is the third side of the triangle to estimate angle
+
+        (locx, locy) = self.calculate_drone_locate_area()
+
+        diffs = [rospy.Time.now() - stamp - rospy.Duration(self.max_pos_delay) for stamp in self.custom_uwb_stamps]
+        for pair in self.uwb_pairs :
+            if diffs[pair[0]] < rospy.Duration(0) and diffs[pair[1]] < rospy.Duration(0) :
+                est_arg = ( ground_distances[pair[0]]**2 + pair[5]**2 - ground_distances[pair[1]] **2 ) / (2 * ground_distances[pair[0]] * pair[5] )
+                if est_arg > -1 and est_arg < 1 :
+                    est_theta = math.acos( est_arg )
+                    if pair[2] > 0 :
+                        est_theta *= locy
+                    else :
+                        est_theta *= locx
+                    # rospy.loginfo("Pair {} -- {}  =========> Theta = {}".format(pair[0], pair[1], est_theta))
+                    # sys.stdout.write("Pair {} -- {}  =========> Theta = {}\n".format(pair[0], pair[1], est_theta))
+                    if pair[2] > 0 :
+                        est_x += ground_distances[pair[0]] * math.cos(est_theta) + pair[3]
+                        est_y += ground_distances[pair[0]] * math.sin(est_theta) + pair[4]
+                    else :
+                        est_x += ground_distances[pair[0]] * math.sin(est_theta) + pair[3]
+                        est_y += ground_distances[pair[0]] * math.cos(est_theta) + pair[4]
+                    est_cnt += 1
+        if est_cnt > 0 :
+            est_relative_pos = numpy.array([est_x, est_y]) / est_cnt
+            rospy.loginfo("Relative position estimate: ({})".format(est_relative_pos))
+            sys.stdout.write("\rRelative position estimate: ({})   ---   {}   ---   {}".format(est_relative_pos, self.custom_uwb_ranges, (locx, locy)))
+            sys.stdout.flush()
+
+            # "Fake" UGV pos (compared to DRTLS UWB)
+            self.ugv_uwb_pos = PoseStamped()
+            self.ugv_uwb_pos.header.stamp = rospy.Time.now()
+            self.ugv_uwb_pos.pose.position.x = self.ugv_xoffset
+            self.ugv_uwb_pos.pose.position.y = self.ugv_yoffset
+            self.ugv_uwb_pos.pose.position.z = 0
+
+            # "Fake" UAV pos (compared to DRTLS UWB)
+            self.uav_uwb_pos = PoseStamped()
+            self.uav_uwb_pos.header.stamp = rospy.Time.now()
+            self.uav_uwb_pos.pose.position.x = est_relative_pos[0]
+            self.uav_uwb_pos.pose.position.y = est_relative_pos[1]
+            self.uav_uwb_pos.pose.position.z = self.pos.pose.position.z
+
+            self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
+            self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
+
+        else :
+            rospy.logerr("Could not triangulate with any pair of UGV transceivers.")
+
+    def publish_dist_to_target(self, target) :
+        '''
+            Publish distance to target (timer callback)
+        '''
+        r = Range()
+        r.header.stamp = rospy.Time.now()
+        r.range = self.dist_to_target
+        self.dist_to_target_pub.publish(r)
+
+    def update_objective(self, target) :
+        '''
+            Update objective waypoint in order to move towards target and land (timer callback)
+        '''
+        self.objective = PoseStamped()
+
+        if self.using_custom_uwb :
+
+            # Check at least two ranges are available
+            self.check_min_uwb_ranges()
+            if self.min_uwb_ranges :
+                if self.using_multilateration :
+                    self.calculate_relative_uwb_poses()
+                elif self.using_optimization :
+                    self.calculate_relative_pos_least_squares()
+                else :
+                    rospy.logerr("Choose either multilateration or optimization to calculate relative UWB positions.")
+                self.uav_uwb_fake_publisher.publish(self.uav_uwb_pos)
+                self.ugv_uwb_fake_publisher.publish(self.ugv_uwb_pos)
+                self.uav_uwb_rel_error_publisher.publish(self.rel_pos_error)
+            else :
+                rospy.logwarn("Not enough UWB ranges have been locked...")
+
+        if not self.activated :
+            return
+
+        if self.going_back_home :
+            self.landing_state = "going_back"
+            rospy.loginfo("Going back home FLAG")
+            self.objective = self.pos
+            self.objective.pose.position.z = self.approaching_altitude
+            self.objective.header.stamp = rospy.Time.now()
+            self.objective.pose.orientation.x = 0
+            self.objective.pose.orientation.y = 0
+            self.objective.pose.orientation.z = 0
+            self.objective.pose.orientation.w = 1
+            move_dir = numpy.array([
+                    -self.pos.pose.position.x,
+                    -self.pos.pose.position.y
+                ])
+            self.dist_to_home = numpy.linalg.norm(move_dir)
+
+            # Move or change back to landing
+            if self.dist_to_home < 0.3 and self.dist_to_home >= 0 :
+                if self.arrived_home_time is None :
+                    self.arrived_home_time = rospy.Time.now()
+                elif rospy.Time.now() - self.arrived_home_time > rospy.Duration(self.min_home_stationary_duration) :
+                    if not self.mission_completed :
+                        self.land_and_back_trip_count += 1
+                    if self.land_and_back_trip_count > self.max_landing_trials : 
+                        self.objective.pose.position.z = 0
+                        self.mission_completed = True
+                    else :
+                        self.going_back_home = False
+                        self.arrived_home_time = None
+                else :
+                    self.landing_state = "waiting"
+
+                # Publish info
+                if self.arrived_home_time is not None :
+                    rospy.loginfo("Went back home for {}/{} trials. Staying stationary {}/{} ms".format(
+                            self.land_and_back_trip_count, 
+                            self.max_landing_trials,
+                            (rospy.Time.now() - self.arrived_home_time),
+                            self.min_landing_stationary_duration*1000
+                        ))
+                else :
+                    rospy.loginfo("Starting the landing process again...")
+
+            else :
+                move_dir = self.waypoint_step * move_dir / self.dist_to_home
+                rospy.loginfo("Going back home... {}".format(move_dir))
+                self.landing_state = "going_back"
+
+            self.objective.pose.position.x += move_dir[0]
+            self.objective.pose.position.y += move_dir[1]
+            self.control_pub.publish(self.objective)
+
+        elif self.landing_done :
+            self.landing_state = "landing_done"
+
+            # Stay stationary
+            self.objective = copy.deepcopy(self.pose_when_landing)
+            if self.land_while_ugv_is_moving :
+                ugv_delta_pos = [0,0]
+                ugv_delta_pos[0] = self.ugv_vio_pos_when_landed.pose.pose.position.y - self.ugv_vio_pos.pose.pose.position.y
+                ugv_delta_pos[1] = self.ugv_vio_pos_when_landed.pose.pose.position.x - self.ugv_vio_pos.pose.pose.position.x
+                self.objective.pose.position.x = self.pose_when_landing.pose.position.x + ugv_delta_pos[0]
+                rospy.loginfo("Pose when landing was {}".format(self.pose_when_landing))
+                self.objective.pose.position.y = self.pose_when_landing.pose.position.y + ugv_delta_pos[1]
+                rospy.loginfo("Staying stationary on top of UGV. UGV vio is [{},{}], VIO when landed was [{},{}]. Objective is [{}, {}]".format(
+                    self.ugv_vio_pos.pose.pose.position.x,
+                    self.ugv_vio_pos.pose.pose.position.y,
+                    self.ugv_vio_pos_when_landed.pose.pose.position.x,
+                    self.ugv_vio_pos_when_landed.pose.pose.position.y,
+                    self.objective.pose.position.x,
+                    self.objective.pose.position.y
+                ))
+                rospy.loginfo("Delta poses are {}".format(ugv_delta_pos))
+            self.objective.header.stamp = rospy.Time.now()
+            self.control_pub.publish(self.objective)
+
+            # Check stationary duration before going back home            
+            if self.landing_done_time is None :
+                self.landing_done_time = rospy.Time.now()
+            elif rospy.Time.now() - self.landing_done_time > rospy.Duration(self.min_landing_stationary_duration) :
+                self.landing_done = False
+                self.landing_done_time = None
+                self.going_back_home = True
+
+            # Publish info
+            if self.landing_done_time is not None :
+                self.landing_done_pub.publish(
+                    String(
+                        data = "Landing {} completed. Staying stationary {}/{} ms".format(
+                            self.land_and_back_trip_count, 
+                            (rospy.Time.now() - self.landing_done_time),
+                            self.min_landing_stationary_duration*1000
+                        )
+                    ))
+            else :
+                rospy.loginfo("Landing done. Going back home.")
+                self.landing_state = "going_back"
+
+        else :
+
+            if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
+                self.publishing_objective = False
+                rospy.logwarn("Not receiving UGV UWB pose updates...")
+            elif rospy.Time.now() - self.uav_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay)  and not self.using_custom_uwb :
+                self.publishing_objective = False
+                rospy.logwarn("Not receiving UAV UWB pose updates...")
+            elif rospy.Time.now() - self.pos.header.stamp > rospy.Duration(self.max_pos_delay)  and not self.using_custom_uwb :
+                self.publishing_objective = False
+                rospy.logwarn("Not receiving MAVROS local POS update...")
+            else :
+                self.publishing_objective = True
+                ugv_pos = numpy.array([
+                    self.ugv_uwb_pos.pose.position.x,
+                    self.ugv_uwb_pos.pose.position.y
+                ])
+                uav_pos = numpy.array([
+                    self.uav_uwb_pos.pose.position.x,
+                    self.uav_uwb_pos.pose.position.y
+                ])
+                move_dir = ugv_pos - uav_pos
+                self.dist_to_target = numpy.linalg.norm(move_dir)
+                if self.dist_to_target > self.landing_dist :
+                    move_dir = 0.666 * self.waypoint_step * move_dir / self.dist_to_target
+                else :
+                    if self.using_custom_uwb :
+                        move_dir = self.waypoint_step * move_dir / self.dist_to_target
+                    else : 
+                        ugv_poses = numpy.array([[
+                            pos.pose.position.x,
+                            pos.pose.position.y
+                        ] for pos in self.ugv_uwb_pos_acc])
+                        uav_poses = numpy.array([[
+                            pos.pose.position.x,
+                            pos.pose.position.y
+                        ] for pos in self.uav_uwb_pos_acc])
+                        ugv_pos = ugv_poses.mean(axis=0)
+                        uav_pos = uav_poses.mean(axis=0)
+                        move_dir = ugv_pos - uav_pos
+                        self.dist_to_target = numpy.linalg.norm(move_dir)
+
+                if self.dist_to_target < self.landing_stop_dist :
+                    self.landing_state = "landing_counting"
+                    self.landing_cnt += 1
+                    rospy.loginfo("\n\n ### Landing done {} from {} to {}, dist is {}.\n".format(self.landing_cnt, uav_pos, ugv_pos, self.dist_to_target))
+                    if self.landing_cnt > 1 and not self.landing_done :
+                        self.landing_state = "landing_done"
+                        self.landing_done = True
+                        self.pose_when_landing = copy.deepcopy(self.pos)
+                        
+                        self.pose_when_landing.pose.position.z = self.landing_altitude
+                        if self.land_while_ugv_is_moving :
+                            self.ugv_vio_pos_when_landed = copy.deepcopy(self.ugv_vio_pos)
+                
+                self.objective = self.pos
+                self.objective.header.stamp = rospy.Time.now()
+                self.objective.pose.position.x += move_dir[0]
+                self.objective.pose.position.y += move_dir[1]
+
+                # sys.stdout.write("\rMove dir: ({})".format(move_dir))
+                # sys.stdout.flush()
+
+                if self.dist_to_target > self.closing_dist :
+                    self.objective.pose.position.z = self.approaching_altitude
+                    self.landing_state = "approaching"
+                elif self.dist_to_target > self.landing_dist :
+                    self.objective.pose.position.z = self.closing_altitude
+                    self.landing_state = "closing_in"
+                elif self.dist_to_target <= self.landing_dist and self.dist_to_target >= 0 :
+                    self.objective.pose.position.z = self.landing_altitude
+                    self.landing_state = "landing"
+                else :
+                    rospy.logerr("Distance to target of {} does not make sense...".format(self.dist_to_target))
+                    self.landing_state = "error"
+
+                # Set orientation
+                self.objective.pose.orientation.x = 0#self.ugv_vio_pos.pose.pose.orientation.x
+                self.objective.pose.orientation.y = 0#self.ugv_vio_pos.pose.pose.orientation.y
+                self.objective.pose.orientation.z = 0#self.ugv_vio_pos.pose.pose.orientation.z
+                self.objective.pose.orientation.w = 1#self.ugv_vio_pos.pose.pose.orientation.w
+
+                # Clone orientation to UGV
+                if self.clone_ugv_orientation :
+                    self.objective.pose.orientation.x = self.ugv_vio_pos.pose.pose.orientation.x
+                    self.objective.pose.orientation.y = self.ugv_vio_pos.pose.pose.orientation.y
+                    self.objective.pose.orientation.z = self.ugv_vio_pos.pose.pose.orientation.z
+                    self.objective.pose.orientation.w = self.ugv_vio_pos.pose.pose.orientation.w
+
+                self.control_pub.publish(self.objective)
+
+    def publish_landing_state(self, target) :
+        '''
+            Publishes landing state (TODO create custom ROS message)
+            Initially:
+                - waiting (e.g., on the ground or taking off)
+                - approaching
+                - closing_in
+                - landing
+                - landing_counting
+                - landing_done
+                - going_back
+        '''
+        self.landing_state_pub.publish(self.landing_state)
+        self.landing_state_num_pub.publish(self.landing_state_dict[self.landing_state])
+
+    def run(self) :
+        '''
+            Infinite loop that flies the drone
+        '''
+
+        # Set a rospy state check rate and landing check rate
+        flag_check_rate = rospy.Rate(2.0)
+        land_check_rate = rospy.Rate(10.0)
+
+        # Set objective update timer
+        time.sleep(1)
+        self.objective_timer = rospy.Timer(rospy.Duration(0.1), self.update_objective)
+
+        # Set distance to target publish timer
+        self.dist_to_target_timer = rospy.Timer(rospy.Duration(0.05), self.publish_dist_to_target)
+
+        # Set landing state timer
+        self.landing_state_timer = rospy.Timer(rospy.Duration(0.05), self.publish_landing_state)
+
+        # Wait until objective is being published
+        while not self.publishing_objective and not (self.using_custom_uwb and self.min_uwb_ranges) :
+            rospy.loginfo("Waiting for all control data to be available...")
+            rospy.loginfo("Publishing objective = {}, using_custom_uwb = {}, min_uwb_ranges = {}".format(self.publishing_objective, self.using_custom_uwb, self.min_uwb_ranges))
+            flag_check_rate.sleep()
+            self.check_min_uwb_ranges()
+
+        # Set offboard mode to external
+        rospy.loginfo("Setting offboard mode to external...")
+        rospy.wait_for_service('/uav/offboard/cmd/mode')
+        try:
+            mode = String()
+            mode.data = "external_control"
+            self.pub_state_mode.publish(mode)
+            self.set_ofboard_mode_client("external_control")
+        except rospy.ServiceException as e:
+            rospy.logwarn("Service failed: {}. Offboard mode cannot be changed to external control.".format(e))
+
+        # Start flying towards target and check when we should land
+        rospy.loginfo("Everything in order. Let's fly.")
+        try:
+            while not rospy.is_shutdown() :
+
+                if self.offboard_state != "external" :
+                    pass # TODO print warning and try to change or do something
+
+                else:
+                    pass # TODO everything normal, wait to be on position to land
+
+                # Update objective position and publish it               
+                land_check_rate.sleep()
+
+        except KeyboardInterrupt :
+            rospy.logerr('Keyboard Interrupt detected! Trying to land')
+
+        # Stop objective update timer and land
+        self.objective_timer.shutdown()
+        self.dist_to_target_timer.shutdown()
+        rospy.loginfo("Mission Completed. Landing...")
+        rospy.wait_for_service('/mavros/cmd/land')
+
+
+if __name__ == '__main__':
+    '''
+        Run the node
+    '''
+    try:
+
+        # Create new control object
+        control = LandingControl()
+
+        # Run the mission control
+        control.run()
+
+    except rospy.ROSInterruptException:
+
+        control.objective_timer.shutdown()
+        control.dist_to_target_timer.shutdown()
+        rospy.loginfo("Mission abruptly stopped. Trying to land...")
+        rospy.wait_for_service('/mavros/cmd/land')

@@ -80,6 +80,8 @@ private:
 
     double circle_radius_;
 
+    double square_side_;
+
     fly_fence fly_fence_;
 
     double pos_valid_time_;

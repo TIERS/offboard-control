@@ -1,0 +1,7 @@
+<launch>
+
+    <include file="$(find offboard_control)/launch/rs_t265.launch"/>
+
+    <node name="rs_t265_throttler" type="throttle" pkg="topic_tools" args="messages /uav/t265/odom/sample 50 /uav/t265/odom/sample_throttled" />
+
+</launch>    
