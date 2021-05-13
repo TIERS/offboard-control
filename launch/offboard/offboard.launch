@@ -1,6 +1,6 @@
 <launch>
 
-    <include file="$(find offboard_control)/launch/rs_t265.launch"/>
+    <include file="$(find offboard_control)/launch/sensors/rs_t265.launch"/>
 
     <node name="position_to_mavros" pkg="offboard_control" type="position_to_mavros_node" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/position_to_mavros_params.yaml" command="load"/>
