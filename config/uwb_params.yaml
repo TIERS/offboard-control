@@ -1,5 +1,5 @@
-port: "/dev/uwb"
-tag_name: "dronie"
-use_network: False
-network: "network0"
-verbose: False
+port:         "/dev/uwb"
+tag_name:     "dronie"
+use_network:  False
+network:      "network0"
+verbose:      False

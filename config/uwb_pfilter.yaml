@@ -2,3 +2,4 @@ weights_sigma :           1.2
 num_particles :           400
 uwb_noise :               0.15
 resample_proportion :     0.01
+verbose:                  False
