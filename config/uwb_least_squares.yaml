@@ -1,3 +1,2 @@
-# UWB Publishers
-uav_uwb_topic:        "/dwm1001/tag/dronie/position/ls"
-ugv_uwb_topic:        "/dwm1001/tag/dashgo/position/ls"
+verbose:                False
+uwb_topic_suffix_ls:    "/ls"

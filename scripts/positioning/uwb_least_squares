@@ -27,7 +27,7 @@ sys.path.insert(1, '/home/xianjia/catkin_ws/src/offboard-control/scripts/utils')
 
 from utils import relative_position_from_four_meas
 
-class UWBLeastSquare() :
+class UWBLeastSquares() :
     '''
         ROS Node that estimates position of a single or a set of UWB initiators
         with respect to a set of responders in known positions. It uses a least square
@@ -40,7 +40,7 @@ class UWBLeastSquare() :
         '''
 
         # Init node
-        rospy.init_node('UWB_Least_Square', anonymous=False)
+        rospy.init_node('UWB_Least_Squares', anonymous=False)
 
         # Responder positions
         self.responder_offsets = numpy.array([
@@ -56,25 +56,6 @@ class UWBLeastSquare() :
         self.uav_uwb_pos_acc = [PoseStamped()]*2
         self.ugv_uwb_pos = PoseStamped()
         self.ugv_uwb_pos_acc = [PoseStamped()]*10
-
-        # Subscribe to MAVROS position
-        # self.odom = Odometry()
-        # self.vio_topic =  rospy.get_param("~uav_vio_topic", "/uav/t265/odom/sample")
-        # rospy.loginfo("Subscribing to odometry at {}".format(self.vio_topic))
-        # self.odom_sub = rospy.Subscriber(self.vio_topic, PoseStamped, self.update_odom_cb)
-
-        # Wait to get some odometry
-        # sys.stdout.write("Waiting for odom...")
-        # while not self.pos.header.stamp :
-        #     sys.stdout.write("..")
-        #     sys.stdout.flush()
-        #     time.sleep(0.1)
-        # self.home_pos = self.pos
-        # rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose.pose))
-
-        # Read VIO odom and calculate particle movement
-        self.last_particle_odom = Odometry()
-        self.particle_odom = numpy.zeros(2)
 
         # Custom one-to-four and two-to-four UWB ranging
         self.uwb_range_offset = rospy.get_param("~uwb_range_offset", 0.27)
@@ -98,7 +79,6 @@ class UWBLeastSquare() :
         self.uwb_range_o2 = rospy.get_param("~uwb_range_o2", defualt_uwb_range_o2)
         self.uwb_range_p2 = rospy.get_param("~uwb_range_p2", defualt_uwb_range_p2)
  
-        # rospy.loginfo("uwb: {}, {}".format(self.uwb_range_o2[0], self.uwb_range_o2[0]))
         # UWB Callbacks
         self.custom_uwb_rangeA_sub = rospy.Subscriber(self.uwb_range_o2[0], Float64, self.custom_uwbA_cb)
         self.custom_uwb_rangeB_sub = rospy.Subscriber(self.uwb_range_o2[1], Float64, self.custom_uwbB_cb)
@@ -111,16 +91,13 @@ class UWBLeastSquare() :
         self.second_uwb_rangeD_sub = rospy.Subscriber(self.uwb_range_p2[3], Float64, self.second_uwbD_cb)
 
         # UWB Publishers
-        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position/ls")
-        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position/ls")
-        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic, PoseStamped, queue_size=10)
-        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic, PoseStamped, queue_size=10)
+        uav_uwb_pos_publish_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
+        ugv_uwb_pos_publish_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
+        uwb_topic_suffix = rospy.get_param("~uwb_topic_suffix_ls", "/ls")
+        
+        self.uav_uwb_fake_publisher = rospy.Publisher(uav_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(ugv_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
 
-    def update_odom_cb(self, pos) :
-        '''
-            Update odom from VIO
-        '''
-        self.pos = pos
     
     def custom_uwbA_cb(self, range) :
         '''
@@ -193,24 +170,6 @@ class UWBLeastSquare() :
         if self.second_custom_uwb_ranges[3] < 0 :
             self.second_custom_uwb_ranges[3] = 0
         self.second_custom_uwb_stamps[3] = rospy.Time.now()
-    
-    def velocity(self, x) :
-        '''
-            Use VIO to update position
-        '''
-        xp = x + self.particle_odom
-        return xp
-
-
-    def calc_weights(self, hypotheses, observations, move=None, z = None) :
-        '''
-            Calculate particle weights based on error
-        '''
-        return squared_error(hypotheses, observations, sigma=self.weights_sigma)
-
-    def update_filter(self, target) :
-        pass
-
     
     def calculate_relative_pos_least_squares(self, target) :
         '''
@@ -289,7 +248,7 @@ if __name__ == '__main__':
     '''
 
     # Create new filter object
-    position_caculator = UWBLeastSquare()
+    position_caculator = UWBLeastSquares()
 
     try:
         # Run the mission control
