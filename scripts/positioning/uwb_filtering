@@ -289,7 +289,7 @@ class UWBParticleFilter() :
         # Store to PoseWithCovarianceStamped
         self.pos.pose.pose.position.x = self.pf.mean_state[0]
         self.pos.pose.pose.position.y = self.pf.mean_state[1]
-        self.pos.pose.pose.position.z = self.odom.pose.pose.position.z
+        self.pos.pose.pose.position.z = self.odom.pose.pose.position.z + 0.2
         self.pos.pose.covariance[0] = self.pf.cov_state[0][0]
         self.pos.pose.covariance[1] = self.pf.cov_state[0][1]
         self.pos.pose.covariance[6] = self.pf.cov_state[1][0]

@@ -80,12 +80,12 @@ class dwm1001_localizer:
         if(self.serialPortDWM1001_1.isOpen()):
             rospy.loginfo("Port `O` opened: {}".format(self.serialPortDWM1001_1.name) )
         else:
-            rospy.logerr("Can't open port O: {}".format(self.serialPortDWM1001_1.name))
+            rospy.logerr("Can't open port `O`: {}".format(self.serialPortDWM1001_1.name))
         
         if(self.serialPortDWM1001_2.isOpen()):
             rospy.loginfo("Port `P` opened: {}".format(self.serialPortDWM1001_2.name) )
         else:
-            rospy.logerr("Can't open port P: {}".format(self.serialPortDWM1001_2.name))
+            rospy.logerr("Can't open port `P`: {}".format(self.serialPortDWM1001_2.name))
 
         try: 
             tags = ['A', 'B', 'C', 'D']
