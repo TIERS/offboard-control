@@ -134,11 +134,14 @@ class UWBParticleFilter() :
         self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
 
         # UWB Publishers
-        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
-        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
-        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/pf", PoseStamped, queue_size=10)
-        self.uav_uwb_fake_publisher_cov = rospy.Publisher(self.uav_uwb_topic+"/pf/cov", PoseWithCovarianceStamped, queue_size=10)
-        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/pf", PoseStamped, queue_size=10)
+
+        uav_uwb_pos_publish_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
+        ugv_uwb_pos_publish_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
+        uwb_topic_suffix = rospy.get_param("~uwb_topic_suffix_pf", "/pf")
+        
+        self.uav_uwb_fake_publisher = rospy.Publisher(uav_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
+        self.uav_uwb_fake_publisher_cov = rospy.Publisher(uav_uwb_pos_publish_topic+uwb_topic_suffix+"/cov", PoseWithCovarianceStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(ugv_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
 
     def update_odom_cb(self, odom) :
         '''
