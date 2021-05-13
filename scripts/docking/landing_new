@@ -109,10 +109,6 @@ class LandingControl() :
         self.uav_uwb_subscriber = rospy.Subscriber(self.uav_uwb_topic, PoseStamped, self.uav_uwb_cb)
         self.ugv_uwb_subscriber = rospy.Subscriber(self.ugv_uwb_topic, PoseStamped, self.ugv_uwb_cb)
 
-        # Fake UWB pos publishers 
-        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/fake", PoseStamped, queue_size=10)
-        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/fake", PoseStamped, queue_size=10)
-
         # UGV VIO pose (lower freq)
         self.ugv_vio_pos = Odometry()
         self.ugv_vio_topic = rospy.get_param("~ugv_vio_topic", "/ugv/t265/odom/sample")
@@ -144,51 +140,12 @@ class LandingControl() :
         self.lidar_topic = rospy.get_param("~lidar_topic", "/uav/tfmini_ros_node/range")
         self.lidar_subscriber = rospy.Subscriber(self.lidar_topic, Range, self.lidar_cb)
 
-        # Single ranging subscriber
-        self.single_uwb_range = -1
-        self.single_range_topic = rospy.get_param("~single_uwb_range_topic", "/uwb/range")
-        self.uwb_single_range_sub = rospy.Subscriber(self.single_range_topic, Float64, self.single_uwb_range_cb)
-
-        # Four-by-four matrix ranging
-        self.ranging_matrix = None
-        self.ranging_matrix_topic = rospy.get_param("~four_matrix_topic", "/uwb/matrix/distances")
-        self.ranging_matrix_sub = rospy.Subscriber(self.ranging_matrix_topic, String, self.ranging_matrix_cb)
-
-        # Custom one-to-four UWB ranging
-        self.custom_uwb_ranges = numpy.ones(4)
-        self.custom_uwb_stamps = [rospy.Time()] * 4
-
-        self.second_custom_uwb_ranges = numpy.ones(4)
-        self.second_custom_uwb_stamps = [rospy.Time()] * 4
-
-        self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
-        self.num_uwb_in_use = rospy.get_param("~num_of_custom_uwb", 4)
-        self.min_uwb_ranges = False     # At least 2 transceivers should be active...
-        self.land_while_ugv_is_moving = True#rospy.get_param("~land_while_ugv_moves", False)
+        # Landing approach
+        self.land_while_ugv_is_moving = rospy.get_param("~land_while_ugv_moves", False)
         self.ugv_vio_pos_when_landed = None
-
-        self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.6)
-        self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
-        self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
-        self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
         
-        # Ranging subscribers
+        # UGV Follower
         self.clone_ugv_orientation = rospy.get_param("~clone_ugv_orientation", False)
-
-        # UWB pairs to calculate relative pos and average
-        # 3rd element means x is calculated with cos (+1) or sin (-1)
-        # 4th, 5th elements have to be added to x,y respectively
-        # 6th element is the third side of the triangle to estimate angle
-        self.uwb_pairs = [
-            [0, 3, 1, 0, 0, self.ugv_x0],
-            [1, 2, 1, 0, self.ugv_y0, self.ugv_x0],
-            [0, 1, -1, 0, 0, self.ugv_y0],
-            [3, 2, -1, self.ugv_x0, 0, self.ugv_y0]
-        ]
-
-        # Relative position estimation
-        self.using_multilateration = rospy.get_param("~using_multilateration", False)
-        self.using_optimization = rospy.get_param("~using_optimization", False)
 
         # Landing state publisher
         self.landing_state = "waiting"
@@ -244,164 +201,11 @@ class LandingControl() :
         '''
         self.uav_vio_pos = odom
 
-    def single_uwb_range_cb(self, range) :
-        '''
-            Update single UGV-UAV UWB ranging measurement
-        '''
-        self.single_uwb_range = range
-
-    def ranging_matrix_cb(self, matrix) :
-        '''
-            Update 4by4 ranging matrix
-            TODO extract data to actual matrix
-        '''
-        self.ranging_matrix = matrix.data
-
-    
-
     def lidar_cb(self, range) :
         '''
             Update ground truth position
         '''
         self.lidarz = range.range
-
-    def check_min_uwb_ranges(self) :
-        '''
-            Checks at least two (usable) ranges are available
-        '''
-        cnt = 0
-        diffs = [rospy.Time.now() - stamp for stamp in self.custom_uwb_stamps]
-        for pair in self.uwb_pairs :
-            if diffs[pair[0]] < rospy.Duration(self.max_pos_delay) and diffs[pair[1]] < rospy.Duration(self.max_pos_delay) :
-                cnt += 1
-        if cnt > 0 :
-            self.min_uwb_ranges = True
-        else :
-            self.min_uwb_ranges = False
-
-    def calculate_drone_locate_area(self):
-        '''
-            Calculates where the drone locate of the tage, top-right, top-left, bottom-right, bottom-left
-        '''
-        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[1] and self.custom_uwb_ranges[1] > abs(self.ugv_y0))  \
-           or (self.custom_uwb_ranges[3] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_y0)): 
-            y = -1
-        else:
-            y = 1
-        if (self.custom_uwb_ranges[0] <= self.custom_uwb_ranges[3] and self.custom_uwb_ranges[3] > abs(self.ugv_x0))  \
-           or (self.custom_uwb_ranges[1] <= self.custom_uwb_ranges[2] and self.custom_uwb_ranges[2] > abs(self.ugv_x0)): 
-            x = -1
-        else:
-            x = 1
-        return (x, y)
-    
-    def calculate_relative_pos_least_squares(self) :
-        '''
-            Calculates relative UGV-UAV positions.
-            Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
-            Uses least squares optimization.
-        '''
-        ground_distances = self.custom_uwb_ranges[:3] * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.35) / self.custom_uwb_ranges[:3]) )
-        
-        if not self.uav_uwb_pos.header.stamp :
-            # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
-            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3])
-            rospy.logwarn("Cannot use previous UAV relative pos for LE search.")
-        else :
-            xlim = [self.uav_uwb_pos.pose.position.x - 0.3, self.uav_uwb_pos.pose.position.x + 0.3]
-            ylim = [self.uav_uwb_pos.pose.position.y - 0.3, self.uav_uwb_pos.pose.position.y + 0.3]
-            # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)#, xlim, ylim)
-            uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3], xlim, ylim)
-        
-        # xlim = [self.uav_uwb_pos.pose.position.x - 0.4, self.uav_uwb_pos.pose.position.x + 0.4]
-        # ylim = [self.uav_uwb_pos.pose.position.y - 0.4, self.uav_uwb_pos.pose.position.y + 0.4]
-        # uav_pos, uav_err = relative_position_from_four_meas(self.custom_uwb_ranges[:3])
-        # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)
-        
-        # Done estimating relative position
-        rospy.loginfo("\rRelative position estimate: ({}) with error {} and distances {}".format(uav_pos, uav_err, self.custom_uwb_ranges))
-        # sys.stdout.write("\rRelative position estimate: ({})   with error   {}".format(uav_pos, uav_err))
-        # sys.stdout.flush()
-
-        # "Fake" UGV pos (compared to DRTLS UWB)
-        self.ugv_uwb_pos = PoseStamped()
-        self.ugv_uwb_pos.header.stamp = rospy.Time.now()
-        self.ugv_uwb_pos.pose.position.x = self.ugv_xoffset
-        self.ugv_uwb_pos.pose.position.y = self.ugv_yoffset
-        self.ugv_uwb_pos.pose.position.z = 0
-
-        # "Fake" UAV pos (compared to DRTLS UWB)
-        self.uav_uwb_pos = PoseStamped()
-        self.uav_uwb_pos.header.stamp = rospy.Time.now()
-        self.uav_uwb_pos.pose.position.x = uav_pos[0]
-        self.uav_uwb_pos.pose.position.y = uav_pos[1]
-        self.uav_uwb_pos.pose.position.z = self.pos.pose.position.z
-
-        self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
-        self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
-
-    def calculate_relative_uwb_poses(self) :
-        '''
-            Calculates relative UGV-UAV position based on 2-4 transceivers on the UGV
-        '''
-
-        ground_distances = self.custom_uwb_ranges * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.07) / self.custom_uwb_ranges) )
-
-        est_cnt = 0 # Count how many pairs of transceivers we use to average estimation
-        est_x = 0
-        est_y = 0
-
-        # UWB pairs to calculate relative pos and average
-        # 3rd element means x is calculated with cos (+1) or sin (-1)
-        # 4th, 5th elements have to be added to x,y respectively (offsets)
-        # 6th element is the third side of the triangle to estimate angle
-
-        (locx, locy) = self.calculate_drone_locate_area()
-
-        diffs = [rospy.Time.now() - stamp - rospy.Duration(self.max_pos_delay) for stamp in self.custom_uwb_stamps]
-        for pair in self.uwb_pairs :
-            if diffs[pair[0]] < rospy.Duration(0) and diffs[pair[1]] < rospy.Duration(0) :
-                est_arg = ( ground_distances[pair[0]]**2 + pair[5]**2 - ground_distances[pair[1]] **2 ) / (2 * ground_distances[pair[0]] * pair[5] )
-                if est_arg > -1 and est_arg < 1 :
-                    est_theta = math.acos( est_arg )
-                    if pair[2] > 0 :
-                        est_theta *= locy
-                    else :
-                        est_theta *= locx
-                    # rospy.loginfo("Pair {} -- {}  =========> Theta = {}".format(pair[0], pair[1], est_theta))
-                    # sys.stdout.write("Pair {} -- {}  =========> Theta = {}\n".format(pair[0], pair[1], est_theta))
-                    if pair[2] > 0 :
-                        est_x += ground_distances[pair[0]] * math.cos(est_theta) + pair[3]
-                        est_y += ground_distances[pair[0]] * math.sin(est_theta) + pair[4]
-                    else :
-                        est_x += ground_distances[pair[0]] * math.sin(est_theta) + pair[3]
-                        est_y += ground_distances[pair[0]] * math.cos(est_theta) + pair[4]
-                    est_cnt += 1
-        if est_cnt > 0 :
-            est_relative_pos = numpy.array([est_x, est_y]) / est_cnt
-            rospy.loginfo("Relative position estimate: ({})".format(est_relative_pos))
-            sys.stdout.write("\rRelative position estimate: ({})   ---   {}   ---   {}".format(est_relative_pos, self.custom_uwb_ranges, (locx, locy)))
-            sys.stdout.flush()
-
-            # "Fake" UGV pos (compared to DRTLS UWB)
-            self.ugv_uwb_pos = PoseStamped()
-            self.ugv_uwb_pos.header.stamp = rospy.Time.now()
-            self.ugv_uwb_pos.pose.position.x = self.ugv_xoffset
-            self.ugv_uwb_pos.pose.position.y = self.ugv_yoffset
-            self.ugv_uwb_pos.pose.position.z = 0
-
-            # "Fake" UAV pos (compared to DRTLS UWB)
-            self.uav_uwb_pos = PoseStamped()
-            self.uav_uwb_pos.header.stamp = rospy.Time.now()
-            self.uav_uwb_pos.pose.position.x = est_relative_pos[0]
-            self.uav_uwb_pos.pose.position.y = est_relative_pos[1]
-            self.uav_uwb_pos.pose.position.z = self.pos.pose.position.z
-
-            self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
-            self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
-
-        else :
-            rospy.logerr("Could not triangulate with any pair of UGV transceivers.")
 
     def publish_dist_to_target(self, target) :
         '''
