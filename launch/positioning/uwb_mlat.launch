@@ -1,5 +1,6 @@
 <launch>
     <node name="uwb_multilateration" pkg="offboard_control" type="uwb_multilateration" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
         <rosparam file="$(find offboard_control)/config/uwb_mlat.yaml" command="load"/>
     </node>
 </launch>

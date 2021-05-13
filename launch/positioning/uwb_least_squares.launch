@@ -1,5 +1,6 @@
 <launch>
     <node name="uwb_least_squares" pkg="offboard_control" type="uwb_least_squares" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
         <rosparam file="$(find offboard_control)/config/uwb_least_squares.yaml" command="load"/>
     </node>
 </launch>
