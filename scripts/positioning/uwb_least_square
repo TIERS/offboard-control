@@ -22,8 +22,10 @@ from mpl_toolkits.mplot3d       import Axes3D
 
 import sys
 sys.path.insert(1, '/home/bot/iany_ws/src/offboard-control/scripts/utils')
-from utils import relative_position_from_four_meas
+import sys
+sys.path.insert(1, '/home/xianjia/catkin_ws/src/offboard-control/scripts/utils')
 
+from utils import relative_position_from_four_meas
 
 class UWBLeastSquare() :
     '''
@@ -103,10 +105,10 @@ class UWBLeastSquare() :
         self.second_uwb_rangeD_sub = rospy.Subscriber("/dwm1001/P2D/distance", Float64, self.second_uwbD_cb)
 
         # UWB Publishers
-        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
-        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
-        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/ls", PoseStamped, queue_size=10)
-        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/ls", PoseStamped, queue_size=10)
+        self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position/ls")
+        self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position/ls")
+        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic, PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic, PoseStamped, queue_size=10)
 
     def update_odom_cb(self, pos) :
         '''

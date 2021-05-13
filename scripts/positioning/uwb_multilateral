@@ -113,8 +113,8 @@ class UWBMultiLateral():
         # UWB Publishers
         self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
         self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
-        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic+"/ml", PoseStamped, queue_size=10)
-        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic+"/ml", PoseStamped, queue_size=10)
+        self.uav_uwb_fake_publisher = rospy.Publisher(self.uav_uwb_topic, PoseStamped, queue_size=10)
+        self.ugv_uwb_fake_publisher = rospy.Publisher(self.ugv_uwb_topic, PoseStamped, queue_size=10)
 
     def update_odom_cb(self, pos) :
         '''
