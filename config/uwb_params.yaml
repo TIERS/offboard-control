@@ -4,6 +4,8 @@ use_network:          False
 network:              "network0"
 verbose:              False
 
+uav_vio_topic:        "/uav/t265/odom/sample"
+
 uwb_range_offset:     0.27
 using_custom_uwb:     False    # Do not use Decawave's DRTLS
 num_of_custom_uwb:    4
