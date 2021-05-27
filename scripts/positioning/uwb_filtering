@@ -67,21 +67,23 @@ class UWBParticleFilter() :
         )
 
         # Subscribe to MAVROS position
-        self.odom = Odometry()
+        self.odom = PoseStamped()#Odometry()
         self.vio_topic =  rospy.get_param("~uav_vio_topic", "/uav/t265/odom/sample")
         rospy.loginfo("Subscribing to odometry at {}".format(self.vio_topic))
-        self.odom_sub = rospy.Subscriber(self.vio_topic, Odometry, self.update_odom_cb)
+        self.odom_sub = rospy.Subscriber(self.vio_topic, PoseStamped, self.update_odom_cb)
 
         # Wait to get some odometry
         sys.stdout.write("Waiting for odom...")
-        while not self.odom.header.stamp :
+        for _ in range(100) :
+            if self.odom.header.stamp :
+                break
             sys.stdout.write("..")
             sys.stdout.flush()
             time.sleep(0.1)
-        rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose.pose))
+        rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose))
 
         # Read VIO odom and calculate particle movement
-        self.last_particle_odom = Odometry()
+        self.last_particle_odom = PoseStamped()
         self.particle_odom = numpy.zeros(2)
 
         # Custom one-to-four and two-to-four UWB ranging
@@ -276,12 +278,12 @@ class UWBParticleFilter() :
         ])
 
         # Calculate odom from last PF uptdate
-        self.particle_odom[0] = self.odom.pose.pose.position.x - self.last_particle_odom.pose.pose.position.x
-        self.particle_odom[1] = self.odom.pose.pose.position.y - self.last_particle_odom.pose.pose.position.y
+        self.particle_odom[0] = self.odom.pose.position.x - self.last_particle_odom.pose.position.x
+        self.particle_odom[1] = self.odom.pose.position.y - self.last_particle_odom.pose.position.y
         self.last_particle_odom = self.odom
 
         # Get Zs
-        particles_z = numpy.ones((self.num_particles, 1)) * self.odom.pose.pose.position.z
+        particles_z = numpy.ones((self.num_particles, 1)) * self.odom.pose.position.z
 
         self.pf.update(observed=new_meas, move=self.particle_odom, particles_z=particles_z)
 
@@ -292,7 +294,7 @@ class UWBParticleFilter() :
         # Store to PoseWithCovarianceStamped
         self.pos.pose.pose.position.x = self.pf.mean_state[0]
         self.pos.pose.pose.position.y = self.pf.mean_state[1]
-        self.pos.pose.pose.position.z = self.odom.pose.pose.position.z + 0.2
+        self.pos.pose.pose.position.z = self.odom.pose.position.z + 0.2
         self.pos.pose.covariance[0] = self.pf.cov_state[0][0]
         self.pos.pose.covariance[1] = self.pf.cov_state[0][1]
         self.pos.pose.covariance[6] = self.pf.cov_state[1][0]
