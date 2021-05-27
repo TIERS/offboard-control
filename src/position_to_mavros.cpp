@@ -120,10 +120,10 @@ void position_to_mavros::run(const ros::TimerEvent& event){
         local_pos_.pose.position.x = uwb_pos_.pose.position.x + vision_pos_.pose.position.x -  vision_last_pos_.pose.position.x;
         local_pos_.pose.position.y = uwb_pos_.pose.position.y + vision_pos_.pose.position.y -  vision_last_pos_.pose.position.y;
         local_pos_.pose.position.z = uwb_pos_.pose.position.z + vision_pos_.pose.position.z -  vision_last_pos_.pose.position.z;
-        local_pos_.pose.orientation.x = uwb_pos_.pose.orientation.x + vision_pos_.pose.orientation.x -  vision_last_pos_.pose.orientation.x;
-        local_pos_.pose.orientation.y = uwb_pos_.pose.orientation.y + vision_pos_.pose.orientation.y -  vision_last_pos_.pose.orientation.y;
-        local_pos_.pose.orientation.z = uwb_pos_.pose.orientation.z + vision_pos_.pose.orientation.z -  vision_last_pos_.pose.orientation.z;
-        local_pos_.pose.orientation.w = uwb_pos_.pose.orientation.w + vision_pos_.pose.orientation.w -  vision_last_pos_.pose.orientation.w;
+        local_pos_.pose.orientation.x =  vision_pos_.pose.orientation.x;
+        local_pos_.pose.orientation.y =  vision_pos_.pose.orientation.y;
+        local_pos_.pose.orientation.z =  vision_pos_.pose.orientation.z;
+        local_pos_.pose.orientation.w =  vision_pos_.pose.orientation.w;
     }
     local_pos_pub_.publish(local_pos_);    
 }
