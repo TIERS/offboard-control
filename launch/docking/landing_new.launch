@@ -1,0 +1,7 @@
+<launch>
+
+    <node name="landing_new" pkg="offboard_control" type="landing_new" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/landing_params.yaml" command="load"/>
+    </node>
+
+</launch>
