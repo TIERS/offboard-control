@@ -1,2 +1,3 @@
 verbose:                False
 uwb_topic_suffix_ls:    "/ls"
+uwb_hist_length:        5

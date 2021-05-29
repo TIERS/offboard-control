@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
-import os
 import sys
-import math
 import time
-import copy
 import rospy
 import numpy
 
@@ -14,12 +11,6 @@ from std_msgs.msg       import Float64
 from sensor_msgs.msg    import Range
 
 from geometry_msgs.msg  import PoseStamped
-
-
-import sys
-sys.path.insert(1, '/home/bot/iany_ws/src/offboard-control/scripts/utils')
-import sys
-sys.path.insert(1, '/home/xianjia/catkin_ws/src/offboard-control/scripts/utils')
 
 from utils import ls_uwb_vio_estimator, relative_position_from_four_meas
 
@@ -244,7 +235,6 @@ class UWBLeastSquaresHist() :
 
         self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
         self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
-        # rospy.loginfo("ugv: {}".format(self.uav_uwb_pos.pose.position.x))
 
 
     def run(self) :
@@ -255,7 +245,7 @@ class UWBLeastSquaresHist() :
         # Set position calculating timer at 6 Hz
         time.sleep(1)
         rospy_check_rate = rospy.Rate(10.0)
-        self.filter_timer = rospy.Timer(rospy.Duration(2.0/6), self.calculate_relative_pos_least_squares)
+        self.filter_timer = rospy.Timer(rospy.Duration(1.0/6), self.calculate_relative_pos_least_squares)
         
         # Start calculating relative positions
         rospy.loginfo("Starting Least Square Position Calculation...")
