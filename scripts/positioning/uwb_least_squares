@@ -20,11 +20,6 @@ from geometry_msgs.msg  import PoseStamped
 from mpl_toolkits.mplot3d       import Axes3D
 
 
-import sys
-sys.path.insert(1, '/home/bot/iany_ws/src/offboard-control/scripts/utils')
-import sys
-sys.path.insert(1, '/home/xianjia/catkin_ws/src/offboard-control/scripts/utils')
-
 from utils import relative_position_from_four_meas
 
 class UWBLeastSquares() :
@@ -36,7 +31,7 @@ class UWBLeastSquares() :
 
     def __init__(self) :
         '''
-            TODO
+            TODO Docstring
         '''
 
         # Init node
@@ -49,7 +44,6 @@ class UWBLeastSquares() :
             [0.56, 0.56, 0.23],
             [0.56, 0, 0.23]
         ])
-
 
         self.pos = PoseStamped()
         self.uav_uwb_pos = PoseStamped()
@@ -177,7 +171,6 @@ class UWBLeastSquares() :
             Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
             Uses least squares optimization.
         '''
-        rospy.loginfo("calculation position ...")
         ground_distances = self.custom_uwb_ranges[:3] * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.35) / self.custom_uwb_ranges[:3]) )
         
         if not self.uav_uwb_pos.header.stamp :
@@ -192,7 +185,7 @@ class UWBLeastSquares() :
         
         # Done estimating relative position
         # rospy.loginfo("\rRelative position estimate: ({}) with error {} and distances {}".format(uav_pos, uav_err, self.custom_uwb_ranges))
-        sys.stdout.write("\rRelative position estimate: ({})   with error   {}".format(uav_pos, uav_err))
+        sys.stdout.write("\r --> Relative position estimate: ({})   with error   {}".format(uav_pos, uav_err))
         sys.stdout.flush()
         self.rel_pos_error = uav_err
 
@@ -214,8 +207,6 @@ class UWBLeastSquares() :
 
         self.uav_uwb_pos_acc.pop(0) and self.uav_uwb_pos_acc.append(self.uav_uwb_pos)
         self.ugv_uwb_pos_acc.pop(0) and self.ugv_uwb_pos_acc.append(self.ugv_uwb_pos)
-        rospy.loginfo("ugv: {}".format(self.uav_uwb_pos.pose.position.x))
-
 
     def run(self) :
         '''
