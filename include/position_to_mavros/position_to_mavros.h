@@ -48,6 +48,8 @@ public:
 
     geometry_msgs::PoseStamped local_pos_;
 
+    geometry_msgs::PoseStamped vision_last_pos_;
+
 
 public:
     position_to_mavros(ros::NodeHandle& nh);

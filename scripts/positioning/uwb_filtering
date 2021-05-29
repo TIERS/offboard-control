@@ -80,10 +80,10 @@ class UWBParticleFilter() :
             sys.stdout.write("..")
             sys.stdout.flush()
             time.sleep(0.1)
-        rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose.pose))
+        rospy.loginfo("Odometry locked. Current odom: \n{}".format(self.odom.pose))
 
         # Read VIO odom and calculate particle movement
-        self.last_particle_odom = Odometry()
+        self.last_particle_odom = PoseStamped()
         self.particle_odom = numpy.zeros(2)
 
         # Custom one-to-four and two-to-four UWB ranging

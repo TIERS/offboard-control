@@ -1,5 +1,5 @@
-only_vision: true
-pose_pub_topic: "/uav/mavros/vision_pose/pose"
-uwb_sub_topic: "/dwm1001/tag/dronie/position"
-vision_sub_topic: "/uav/t265/odom/sample"
-lidar_sub_topic: "/uav/tfmini_ros_node/range"
+only_vision:               true
+pose_pub_topic:            "/uav/mavros/vision_pose/pose"
+vision_sub_topic:          "/uav/t265/odom/sample"
+lidar_sub_topic:           "/uav/tfmini_ros_node/range"
+uwb_sub_topic:             "/dwm1001/tag/dronie/position/pf" # add /ls /mlat  /pf
