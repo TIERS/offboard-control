@@ -36,10 +36,10 @@ void position_to_mavros::uwb_callback(const geometry_msgs::PoseStamped::ConstPtr
     uwb_pos_.pose.position.x = msg->pose.position.x;
     uwb_pos_.pose.position.y = msg->pose.position.y;
     uwb_pos_.pose.position.z = msg->pose.position.z;
-    uwb_pos_.pose.orientation.x = msg->pose.pose.orientation.x;
-    uwb_pos_.pose.orientation.y = msg->pose.pose.orientation.y;
-    uwb_pos_.pose.orientation.z = msg->pose.pose.orientation.z;
-    uwb_pos_.pose.orientation.w = msg->pose.pose.orientation.w;
+    uwb_pos_.pose.orientation.x = msg->pose.orientation.x;
+    uwb_pos_.pose.orientation.y = msg->pose.orientation.y;
+    uwb_pos_.pose.orientation.z = msg->pose.orientation.z;
+    uwb_pos_.pose.orientation.w = msg->pose.orientation.w;
     vision_last_pos_ = vision_pos_;    
 }
 
