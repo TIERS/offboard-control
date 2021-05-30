@@ -9,10 +9,9 @@ uav_vio_topic:        "/uav/mavros/vision_pose/pose"
 uwb_range_offset:     0.27
 using_custom_uwb:     False    # Do not use Decawave's DRTLS
 num_of_custom_uwb:    4
-custom_uwb_xsep:      0.6
-custom_uwb_ysep:      0.6
-custom_uwb_xoffset:   0.3
-custom_uwb_yoffset:   0.3
+
+ugv_xoffset:   0.3
+ugv_yoffset:   0.3
 
 #UWB Range Subscriber
 uwb_range_o2:         ["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]
@@ -21,3 +20,6 @@ uwb_range_p2:         ["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm10
 # UWB Publishers
 uav_uwb_topic:        "/dwm1001/tag/dronie/position"
 ugv_uwb_topic:        "/dwm1001/tag/dashgo/position"
+
+# UWB Responders
+responder_offsets:    [[0, 0, 0.23], [0, 0.56, 0.23], [0.56, 0.56, 0.23], [0.56, 0, 0.23]]

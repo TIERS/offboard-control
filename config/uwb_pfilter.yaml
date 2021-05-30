@@ -5,3 +5,5 @@ resample_proportion :     0.01
 verbose:                  False
 
 uwb_topic_suffix_pf:      "/pf"
+
+uwb_range_topics:         ["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]
