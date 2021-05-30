@@ -7,7 +7,6 @@ import rospy
 import numpy
 
 from std_msgs.msg       import Float64
-
 from geometry_msgs.msg  import PoseStamped
 
 class UWBMultiLateration():
@@ -48,7 +47,6 @@ class UWBMultiLateration():
         self.second_custom_uwb_stamps = [rospy.Time()] * 4
 
         self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
-        self.num_uwb_in_use = rospy.get_param("~num_of_custom_uwb", 4)
         self.min_uwb_ranges = False     # At least 2 transceivers should be active...
 
         self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.6)
