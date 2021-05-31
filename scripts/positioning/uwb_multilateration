@@ -23,7 +23,7 @@ class UWBMultiLateration():
         '''
 
         # Init node
-        rospy.init_node('UWB_Multilateration', anonymous=False)
+        rospy.init_node('UWB_Multilateration', anonymous = True)
 
         # Responder positions
         self.responder_offsets = numpy.array([

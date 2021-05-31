@@ -24,7 +24,7 @@ class AVGPoses() :
         '''
 
         # Init node
-        rospy.init_node('Pose_Averager', anonymous=False)
+        rospy.init_node('Pose_Averager', anonymous = True)
 
         # Basic attributes
         self.avg_pose = PoseStamped()
@@ -45,7 +45,7 @@ class AVGPoses() :
         # Pose subscribers
         self.pose_subs = []
         self.pose_topics = json.loads(
-            rospy.get_param("~uwb_range_topics", '["/dwm1001/tag/dronie/position/pf/O", "/dwm1001/tag/dronie/position/pf/P"]')
+            rospy.get_param("~pose_topics", '["/dwm1001/tag/dronie/position/pf/O", "/dwm1001/tag/dronie/position/pf/P"]')
         )
         for idx, topic in enumerate(self.pose_topics) :
             self.pose_subs.append(

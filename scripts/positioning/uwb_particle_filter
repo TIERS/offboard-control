@@ -26,7 +26,7 @@ class UWBParticleFilter() :
         '''
 
         # Init node
-        rospy.init_node('UWB_Particle_Filter', anonymous=False)
+        rospy.init_node('UWB_Particle_Filter', anonymous = True)
 
         # Particle filter params
         self.weights_sigma = rospy.get_param("~weights_sigma", 1.2)
