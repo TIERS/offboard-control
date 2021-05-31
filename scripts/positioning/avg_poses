@@ -33,12 +33,12 @@ class AVGPoses() :
         # Relative positions and weights
         self.pose_translations = numpy.array(
             json.loads(
-                rospy.get_param("pose_translations", '[[-0.1, 0.35], [-0.1, -0.35]]')
+                rospy.get_param("~pose_translations", '[[-0.1, 0.35, 0], [-0.1, -0.35, 0]]')
             )
         )
         self.pose_weights = numpy.array(
             json.loads(
-                rospy.get_param("pose_weights", '[0.5, 0.5]')
+                rospy.get_param("~pose_weights", '[0.5, 0.5]')
             )
         )
 
@@ -51,7 +51,8 @@ class AVGPoses() :
             self.pose_subs.append(
                 rospy.Subscriber(topic, PoseStamped, self.pose_cb, idx)
             )
-        self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
+            rospy.loginfo("Subscribing to {}".format(topic))
+        self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.4)
 
         # Averaged pose publisher
         self.num_of_poses = len(self.pose_topics)
@@ -83,18 +84,22 @@ class AVGPoses() :
             for idx, p in enumerate(self.poses)
         ]) + self.pose_translations
 
-        weights = copy(self.pose_weights)
+        weights = copy.deepcopy(self.pose_weights)
 
         # For now if a pose is late/ not available,
         # we distribute its weight among others
-        bad_poses_idx = []
         num_of_invalid_poses = 0
         total_invalid_weight = 0
         for idx, p in enumerate(self.poses) :
             if rospy.Time.now() - p.header.stamp >= rospy.Duration(self.max_pos_delay) :
-                bad_poses_idx.append(idx)
                 num_of_invalid_poses += 1
                 total_invalid_weight += weights[idx]
+                pose_delay = rospy.Time.now() - p.header.stamp
+                rospy.logwarn("Pose {} is coming with delay of {}s and {}ms".format(
+                    self.pose_topics[idx],
+                    pose_delay.secs,
+                    pose_delay.nsecs / 1000000
+                ))
         
         # If no poses within max_pos_delay then print error
         # and return
@@ -104,16 +109,19 @@ class AVGPoses() :
         
         # If some poses are not available
         # divide weight among the rest
-        if len(bad_poses_idx) > 0 :
+        if num_of_invalid_poses > 0 :
             extra_weight_per_pose = total_invalid_weight / num_of_invalid_poses
             weights += extra_weight_per_pose
 
         # We can just average with updated weights
         # because invalid poses are zeroed
-        average_position = numpy.mean(
-            current_poses * weights,
-            axis = 1
+        average_position = numpy.sum(
+            numpy.array(
+                [p*weights[idx] for idx, p in enumerate(current_poses)]
+            ),
+            axis = 0
         )
+
         average_pose = PoseStamped()
         average_pose.header.stamp = rospy.Time.now()
         average_pose.pose.position.x = average_position[0]
