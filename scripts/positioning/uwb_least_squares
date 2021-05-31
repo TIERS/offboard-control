@@ -6,9 +6,6 @@ import time
 import rospy
 import numpy
 
-# import sys
-sys.path.append("/home/xianjia/ros_ws/catkin_ws/src/offboard-control/scripts/utils")
-
 from std_msgs.msg       import Float64
 from geometry_msgs.msg  import PoseStamped
 
