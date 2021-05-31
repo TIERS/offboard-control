@@ -1,4 +1,5 @@
 <launch>
+
     <node name="uwb_least_squares_O" pkg="offboard_control" type="uwb_least_squares" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
         <rosparam file="$(find offboard_control)/config/uwb_least_squares.yaml" command="load"/>
@@ -12,4 +13,11 @@
         <param name="uwb_topic_suffix_ls" value="/ls/P" />
         <param name="uwb_range_topics" value='["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm1001/P2C/distance", "/dwm1001/P2D/distance"]' />
     </node>
+
+    <node name="avg_poses_least_squares" pkg="offboard_control" type="avg_poses" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/pose_avg.yaml" command="load"/>
+        <param name="out_topic" value="/dwm1001/tag/dronie/position/ls" />
+        <param name="pose_topics" value='["/dwm1001/tag/dronie/position/ls/O", "/dwm1001/tag/dronie/position/ls/P"]' />
+    </node>
+    
 </launch>
