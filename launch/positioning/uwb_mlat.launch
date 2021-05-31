@@ -1,6 +1,14 @@
 <launch>
-    <node name="uwb_multilateration" pkg="offboard_control" type="uwb_multilateration" respawn="true" output="screen">
+    <node name="uwb_multilateration_O" pkg="offboard_control" type="uwb_multilateration" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
         <rosparam file="$(find offboard_control)/config/uwb_mlat.yaml" command="load"/>
+        <param name="uwb_topic_suffix_mlat" value="/mlat/O" />
+        <param name="uwb_range_topics" value='["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]' />
+    </node>
+    <node name="uwb_multilateration_P" pkg="offboard_control" type="uwb_multilateration" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
+        <rosparam file="$(find offboard_control)/config/uwb_mlat.yaml" command="load"/>
+        <param name="uwb_topic_suffix_mlat" value="/mlat/P" />
+        <param name="uwb_range_topics" value='["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm1001/P2C/distance", "/dwm1001/P2D/distance"]' />
     </node>
 </launch>
