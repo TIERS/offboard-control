@@ -13,9 +13,10 @@ num_of_custom_uwb:    4
 ugv_xoffset:   0.3
 ugv_yoffset:   0.3
 
-#UWB Range Subscriber
-uwb_range_o2:         ["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]
-uwb_range_p2:         ["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm1001/P2C/distance", "/dwm1001/P2D/distance"]
+# UWB Range Subscriber
+# Topics in a JSON array
+uwb_range_o2:         '["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]'
+uwb_range_p2:         '["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm1001/P2C/distance", "/dwm1001/P2D/distance"]'
 
 # UWB Publishers
 uav_uwb_topic:        "/dwm1001/tag/dronie/position"
