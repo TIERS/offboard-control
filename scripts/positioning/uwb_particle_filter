@@ -196,6 +196,7 @@ class UWBParticleFilter() :
             rospy.logwarn("PF covariance too high with covx={} and covy={}".format(self.pf.cov_state[0], self.pf.cov_state[1]))
 
         # Store to PoseWithCovarianceStamped
+        self.pos.header.stamp = rospy.Time.now()
         self.pos.pose.pose.position.x = self.pf.mean_state[0]
         self.pos.pose.pose.position.y = self.pf.mean_state[1]
         self.pos.pose.pose.position.z = self.odom.pose.position.z + 0.2
