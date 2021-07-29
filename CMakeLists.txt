@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   # PCL
   sensor_msgs 
   pcl_ros
+  tf2_geometry_msgs
 )
 
 ## System dependencies are found with CMake's conventions
