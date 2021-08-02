@@ -4,28 +4,30 @@ name: ROS Melodic
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
+  # On all pushes and PRs
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  
+  # Run every day at 4 am
+  schedule:
+    - cron:  '0 4 * * *'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# Build job
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    strategy:
+      matrix:
+        env:
+          - {ROS_DISTRO: melodic, ROS_REPO: main}
+    env:
+      CCACHE_DIR: /github/home/.ccache # Directory for ccache (and how we enable ccache in industrial_ci)
     runs-on: ubuntu-18.04
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - uses: ros-tooling/setup-ros@v0.2
-        with:
-          required-ros-distributions: melodic
-      - uses: ros-tooling/action-ros-ci@v0.2
-        with:
-          package-name: offboard_control
-          target-ros1-distro: melodic
+      - uses: actions/checkout@v1
+      - uses: 'ros-industrial/industrial_ci@master'
+        env: ${{matrix.env}}
