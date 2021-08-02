@@ -134,7 +134,7 @@ void safe_offboard::mode_cb(const std_msgs::String::ConstPtr& msg)
 }
 
 
-bool safe_offboard::flight_mode_srv_cb(offboard_control::flight_mode::Request &request, offboard_control::flight_mode::Response &response)
+bool safe_offboard::flight_mode_srv_cb(tiers_ros_msgs::flight_mode::Request &request, tiers_ros_msgs::flight_mode::Response &response)
 {
     if (request.mode == "land")
     {
@@ -172,7 +172,7 @@ bool safe_offboard::flight_mode_srv_cb(offboard_control::flight_mode::Request &r
 }
 
 
-bool safe_offboard::offboard_state_srv_cb(offboard_control::offboard_state::Request &request, offboard_control::offboard_state::Response &response)
+bool safe_offboard::offboard_state_srv_cb(tiers_ros_msgs::offboard_state::Request &request, tiers_ros_msgs::offboard_state::Response &response)
 {
     if (request.state == "disarmed")
     {
