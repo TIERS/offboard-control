@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import os
 import sys
-import math
 import time
 import copy
 import rospy
@@ -18,10 +16,6 @@ from sensor_msgs.msg    import Range
 from geometry_msgs.msg  import PoseStamped
 
 from offboard_control.srv  import flight_mode as OffMode
-
-from utils import relative_position_from_four_meas
-
-
 
 class LandingControl() :
     '''
@@ -89,7 +83,7 @@ class LandingControl() :
         self.local_pos_topic =  rospy.get_param("~local_pos_topic", "/uav/mavros/local_position/pose")
         rospy.loginfo("Subscribing to local (mavros) position at {}".format(self.local_pos_topic))
 
-        self.local_pos_sub = rospy.Subscriber(self.local_pos_topic, PoseStamped, self.update_current_pos_cb)
+        self.local_pos_sub = rospy.Subscriber(self.local_pos_topic, PoseStamped, self.local_pos_cb)
 
         # Wait to get local pos lock
         sys.stdout.write("Waiting for (mavros) local pos lock...")
@@ -101,13 +95,25 @@ class LandingControl() :
         rospy.loginfo("Home position locked: \n{}".format(self.pos.pose))
 
         # UWB Subscribers
+        self.use_absolute_uwb = rospy.get_param("~use_absolute_uwb", True)
         self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
         self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
-        rospy.loginfo("Subscribing to UAV UWB at {}".format(self.uav_uwb_topic))
-        rospy.loginfo("Subscribing to UGV UWB at {}".format(self.ugv_uwb_topic))
-
-        self.uav_uwb_subscriber = rospy.Subscriber(self.uav_uwb_topic, PoseStamped, self.uav_uwb_cb)
-        self.ugv_uwb_subscriber = rospy.Subscriber(self.ugv_uwb_topic, PoseStamped, self.ugv_uwb_cb)
+        if self.use_absolute_uwb :
+            rospy.loginfo("Subscribing to UAV UWB at {}".format(self.uav_uwb_topic))
+            rospy.loginfo("Subscribing to UGV UWB at {}".format(self.ugv_uwb_topic))
+            self.uav_uwb_subscriber = rospy.Subscriber(self.uav_uwb_topic, PoseStamped, self.uav_uwb_cb)
+            self.ugv_uwb_subscriber = rospy.Subscriber(self.ugv_uwb_topic, PoseStamped, self.ugv_uwb_cb)
+        
+        # Custom UWB Subscribers
+        self.use_relative_uwb = rospy.get_param("~use_relative_uwb", False)
+        if self.use_relative_uwb :
+            self.relative_uwb_suffix = rospy.get_param("~relative_uwb_suffix", "/pf")
+            self.relative_uav_uwb_topic = self.uav_uwb_topic + self.relative_uwb_suffix
+            self.relative_ugv_uwb_topic = self.ugv_uwb_topic + self.relative_uwb_suffix
+            rospy.loginfo("Subscribing to UAV UWB at {}".format(self.uav_uwb_topic))
+            rospy.loginfo("Subscribing to UGV UWB at {}".format(self.ugv_uwb_topic))
+            self.relative_uav_uwb_subscriber = rospy.Subscriber(self.relative_uav_uwb_topic, PoseStamped, self.uav_uwb_cb)
+            self.relative_ugv_uwb_subscriber = rospy.Subscriber(self.relative_ugv_uwb_topic, PoseStamped, self.ugv_uwb_cb)
 
         # UGV VIO pose (lower freq)
         self.ugv_vio_pos = Odometry()
@@ -163,7 +169,7 @@ class LandingControl() :
 
         self.activated = rospy.get_param("~landing_activated", False)
 
-    def update_current_pos_cb(self, pos) :
+    def local_pos_cb(self, pos) :
         '''
             Update position from mavros local pose (callback)
         '''
@@ -222,23 +228,7 @@ class LandingControl() :
         '''
         self.objective = PoseStamped()
 
-        if self.using_custom_uwb :
-
-            # Check at least two ranges are available
-            self.check_min_uwb_ranges()
-            if self.min_uwb_ranges :
-                if self.using_multilateration :
-                    self.calculate_relative_uwb_poses()
-                elif self.using_optimization :
-                    self.calculate_relative_pos_least_squares()
-                else :
-                    rospy.logerr("Choose either multilateration or optimization to calculate relative UWB positions.")
-                self.uav_uwb_fake_publisher.publish(self.uav_uwb_pos)
-                self.ugv_uwb_fake_publisher.publish(self.ugv_uwb_pos)
-            else :
-                rospy.logwarn("Not enough UWB ranges have been locked...")
-
-        if not self.activated :
+        if not self.activated :     # For testing the node with manual flight
             return
 
         if self.going_back_home :
@@ -292,7 +282,7 @@ class LandingControl() :
             self.objective.pose.position.y += move_dir[1]
             self.control_pub.publish(self.objective)
 
-        elif self.landing_done :
+        elif self.landing_done :    # Stay stationary, land, or follow with VIO depending
 
             # Stay stationary
             self.objective = copy.deepcopy(self.pose_when_landing)
@@ -337,7 +327,7 @@ class LandingControl() :
                 rospy.loginfo("Landing done. Going back home.")
                 self.landing_state = "going_back"
 
-        else :
+        else :  # Move towards objective
 
             if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
                 self.publishing_objective = False
@@ -461,13 +451,6 @@ class LandingControl() :
 
         # Set landing state timer
         self.landing_state_timer = rospy.Timer(rospy.Duration(0.05), self.publish_landing_state)
-
-        # Wait until objective is being published
-        while not self.publishing_objective and not (self.using_custom_uwb and self.min_uwb_ranges) :
-            rospy.loginfo("Waiting for all control data to be available...")
-            rospy.loginfo("Publishing objective = {}, using_custom_uwb = {}, min_uwb_ranges = {}".format(self.publishing_objective, self.using_custom_uwb, self.min_uwb_ranges))
-            flag_check_rate.sleep()
-            self.check_min_uwb_ranges()
 
         # Set offboard mode to external
         rospy.loginfo("Setting offboard mode to external...")

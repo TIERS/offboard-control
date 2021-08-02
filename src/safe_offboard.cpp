@@ -134,7 +134,7 @@ void safe_offboard::mode_cb(const std_msgs::String::ConstPtr& msg)
 }
 
 
-bool safe_offboard::flight_mode_srv_cb(offboard_control::flight_mode::Request &request, offboard_control::flight_mode::Response &response)
+bool safe_offboard::flight_mode_srv_cb(tiers_ros_msgs::flight_mode::Request &request, tiers_ros_msgs::flight_mode::Response &response)
 {
     if (request.mode == "land")
     {
@@ -172,7 +172,7 @@ bool safe_offboard::flight_mode_srv_cb(offboard_control::flight_mode::Request &r
 }
 
 
-bool safe_offboard::offboard_state_srv_cb(offboard_control::offboard_state::Request &request, offboard_control::offboard_state::Response &response)
+bool safe_offboard::offboard_state_srv_cb(tiers_ros_msgs::offboard_state::Request &request, tiers_ros_msgs::offboard_state::Response &response)
 {
     if (request.state == "disarmed")
     {
@@ -582,9 +582,11 @@ int main(int argc, char **argv)
 
     ros::NodeHandle n;
 
+    ros::Duration(5).sleep(); // sleep for five seconds to wait for VIO node getting up
+
     safe_offboard so = safe_offboard(n);
     ros::Timer timer = n.createTimer(ros::Duration(0.05), &safe_offboard::check_poses, &so);
-    ros::Timer time_0 = n.createTimer(ros::Duration(0.5), &safe_offboard::pub_offboard_state, &so);
+    ros::Timer time_0 = n.createTimer(ros::Duration(0.2), &safe_offboard::pub_offboard_state, &so);
     so.run();
     
     ros::spin();

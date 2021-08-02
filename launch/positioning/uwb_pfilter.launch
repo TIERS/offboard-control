@@ -1,6 +1,23 @@
 <launch>
-    <node name="uwb_filtering" pkg="offboard_control" type="uwb_filtering" respawn="true" output="screen">
+
+    <node name="uwb_filtering_O" pkg="offboard_control" type="uwb_particle_filter" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
         <rosparam file="$(find offboard_control)/config/uwb_pfilter.yaml" command="load"/>
+        <param name="uwb_topic_suffix_pf" value="/pf/O" />
+        <param name="uwb_range_topics" value='["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]' />
     </node>
+
+    <node name="uwb_filtering_P" pkg="offboard_control" type="uwb_particle_filter" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/uwb_params.yaml" command="load"/>
+        <rosparam file="$(find offboard_control)/config/uwb_pfilter.yaml" command="load"/>
+        <param name="uwb_topic_suffix_pf" value="/pf/P" />
+        <param name="uwb_range_topics" value='["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm1001/P2C/distance", "/dwm1001/P2D/distance"]' />
+    </node>
+
+    <node name="avg_poses_pf" pkg="offboard_control" type="avg_poses" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/pose_avg.yaml" command="load"/>
+        <param name="out_topic" value="/dwm1001/tag/dronie/position/pf" />
+        <param name="pose_topics" value='["/dwm1001/tag/dronie/position/pf/O", "/dwm1001/tag/dronie/position/pf/P"]' />
+    </node>
+
 </launch>

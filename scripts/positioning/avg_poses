@@ -1,0 +1,173 @@
+#!/usr/bin/env python
+
+import json
+import time
+import copy
+
+from numpy.lib.function_base import average
+import rospy
+import numpy
+
+from geometry_msgs.msg  import PoseStamped
+
+class AVGPoses() :
+    '''
+        ROS Node that averages a set of PoseStamped
+        topics given their relative positions and weights.
+        Initially user for positioning robots with
+        multiple UWB transceivers.  
+    '''
+
+    def __init__(self) :
+        '''
+            TODO
+        '''
+
+        # Init node
+        rospy.init_node('Pose_Averager', anonymous = True)
+
+        # Basic attributes
+        self.avg_pose = PoseStamped()
+        self.publish_freq = rospy.get_param("~publish_freq", 10)
+
+        # Relative positions and weights
+        self.pose_translations = numpy.array(
+            json.loads(
+                rospy.get_param("~pose_translations", '[[-0.1, 0.35, 0], [-0.1, -0.35, 0]]')
+            )
+        )
+        self.pose_weights = numpy.array(
+            json.loads(
+                rospy.get_param("~pose_weights", '[0.5, 0.5]')
+            )
+        )
+
+        # Pose subscribers
+        self.pose_subs = []
+        self.pose_topics = json.loads(
+            rospy.get_param("~pose_topics", '["/dwm1001/tag/dronie/position/pf/O", "/dwm1001/tag/dronie/position/pf/P"]')
+        )
+        for idx, topic in enumerate(self.pose_topics) :
+            self.pose_subs.append(
+                rospy.Subscriber(topic, PoseStamped, self.pose_cb, idx)
+            )
+            rospy.loginfo("Subscribing to {}".format(topic))
+        self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.4)
+
+        # Averaged pose publisher
+        self.num_of_poses = len(self.pose_topics)
+        self.poses = [PoseStamped()] * self.num_of_poses
+        self.out_topic = rospy.get_param("~out_topic", "/dwm1001/tag/dronie/position/pf")
+        self.pose_publisher = rospy.Publisher(self.out_topic, PoseStamped, queue_size=10)
+
+        # Do safety checks (non exhaustive)
+        assert len(self.pose_topics) == len(self.pose_translations)
+        assert len(self.poses) == len(self.pose_weights)
+        assert numpy.sum(self.pose_weights) == 1
+
+
+    def pose_cb(self, pose, idx) :
+        '''
+            Update odom from VIO
+        '''
+        self.poses[idx] = pose
+
+    def do_average_and_publish(self, target) :
+        '''
+            Upadate averaged pose and publish
+        '''
+        # Get UWB ranges
+        current_poses = numpy.array([
+            [p.pose.position.x, p.pose.position.y, p.pose.position.z] 
+            if rospy.Time.now() - p.header.stamp < rospy.Duration(self.max_pos_delay)
+            else (-1) * self.pose_translations[idx]
+            for idx, p in enumerate(self.poses)
+        ]) + self.pose_translations
+
+        weights = copy.deepcopy(self.pose_weights)
+
+        # For now if a pose is late/ not available,
+        # we distribute its weight among others
+        num_of_invalid_poses = 0
+        total_invalid_weight = 0
+        for idx, p in enumerate(self.poses) :
+            if rospy.Time.now() - p.header.stamp >= rospy.Duration(self.max_pos_delay) :
+                num_of_invalid_poses += 1
+                total_invalid_weight += weights[idx]
+                pose_delay = rospy.Time.now() - p.header.stamp
+                rospy.logwarn("Pose {} is coming with delay of {}s and {}ms".format(
+                    self.pose_topics[idx],
+                    pose_delay.secs,
+                    pose_delay.nsecs / 1000000
+                ))
+        
+        # If no poses within max_pos_delay then print error
+        # and return
+        if num_of_invalid_poses >= self.num_of_poses :
+            rospy.logerr("No poses left to average !!!\n   --> Not publishing avg pose.")
+            return
+        
+        # If some poses are not available
+        # divide weight among the rest
+        if num_of_invalid_poses > 0 :
+            extra_weight_per_pose = total_invalid_weight / num_of_invalid_poses
+            weights += extra_weight_per_pose
+
+        # We can just average with updated weights
+        # because invalid poses are zeroed
+        average_position = numpy.sum(
+            numpy.array(
+                [p*weights[idx] for idx, p in enumerate(current_poses)]
+            ),
+            axis = 0
+        )
+
+        average_pose = PoseStamped()
+        average_pose.header.stamp = rospy.Time.now()
+        average_pose.pose.position.x = average_position[0]
+        average_pose.pose.position.y = average_position[1]
+        average_pose.pose.position.z = average_position[2]
+
+        self.pose_publisher.publish(average_pose)
+
+    def run(self) :
+        '''
+            Create timer to update filter.
+        '''
+
+        # Set publishing timer
+        time.sleep(2.3)
+        rospy_check_rate = rospy.Rate(10.0)
+        self.filter_timer = rospy.Timer(rospy.Duration(1.0/self.publish_freq), self.do_average_and_publish)
+        
+        # Start calculating relative positions
+        rospy.loginfo("Starting particle filter...")
+        try:
+
+            while not rospy.is_shutdown() :
+                # TO DO add safety checks here
+                # and warnings e.g., if number of poses available changes              
+                rospy_check_rate.sleep()
+
+        except KeyboardInterrupt :
+            rospy.logerr('Keyboard Interrupt detected! Trying to land')
+
+        # Stop objective update timer and land
+        self.filter_timer.shutdown()
+
+
+if __name__ == '__main__':
+    '''
+        Run the node
+    '''
+
+    # Create new filter object
+    averager = AVGPoses()
+
+    try:
+        # Run the mission control
+        averager.run()
+
+    except rospy.ROSInterruptException:
+        filter.filter_timer.shutdown()
+        rospy.loginfo("UWB particle filter stopped.")

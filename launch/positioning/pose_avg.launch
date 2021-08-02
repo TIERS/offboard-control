@@ -1,0 +1,9 @@
+<launch>
+
+    <node name="avg_poses_pf" pkg="offboard_control" type="avg_poses" respawn="true" output="screen">
+        <rosparam file="$(find offboard_control)/config/pose_avg.yaml" command="load"/>
+        <param name="topic_out" value="/dwm1001/tag/dronie/position/pf" />
+        <param name="pose_topics" value='["/dwm1001/tag/dronie/position/pf/O", "/dwm1001/tag/dronie/position/pf/P"]' />
+    </node>
+
+</launch>

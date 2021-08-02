@@ -1,14 +1,3 @@
-uwb_range_offset: 0.27
-using_custom_uwb: False    # Do not use Decawave's DRTLS
-num_of_custom_uwb: 4
-custom_uwb_xsep: 0.6
-custom_uwb_ysep: 0.6
-custom_uwb_xoffset: 0.3
-custom_uwb_yoffset: 0.3
-max_pos_delay: 0.2
-
-# UWB Callbacks
-
-# UWB Publishers
-uav_uwb_topic: "/dwm1001/tag/dronie/position/ml"
-ugv_uwb_topic: "/dwm1001/tag/dashgo/position/ml"
+max_pos_delay:          0.2
+verbose:                False
+uwb_topic_suffix_mlat:  "/mlat"

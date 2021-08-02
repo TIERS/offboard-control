@@ -8,8 +8,8 @@
 #include <mavros_msgs/State.h>
 #include <std_srvs/SetBool.h>
 #include <std_msgs/String.h>
-#include "offboard_control/flight_mode.h"
-#include "offboard_control/offboard_state.h"
+#include "tiers_ros_msgs/flight_mode.h"
+#include "tiers_ros_msgs/offboard_state.h"
 
 struct point
 {
@@ -103,9 +103,9 @@ public:
 
     void mode_cb(const std_msgs::String::ConstPtr& msg);
 
-    bool flight_mode_srv_cb(offboard_control::flight_mode::Request &request, offboard_control::flight_mode::Response &response);
+    bool flight_mode_srv_cb(tiers_ros_msgs::flight_mode::Request &request, tiers_ros_msgs::flight_mode::Response &response);
 
-    bool offboard_state_srv_cb(offboard_control::offboard_state::Request &request, offboard_control::offboard_state::Response &response);
+    bool offboard_state_srv_cb(tiers_ros_msgs::offboard_state::Request &request, tiers_ros_msgs::offboard_state::Response &response);
 
     bool emergency_srv_cb(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response);
 

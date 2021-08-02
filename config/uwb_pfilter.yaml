@@ -2,3 +2,10 @@ weights_sigma :           1.2
 num_particles :           400
 uwb_noise :               0.15
 resample_proportion :     0.01
+verbose:                  False
+
+uwb_topic_suffix_pf:      "/pf"
+
+# UWB Range Subscriber
+# Topics in a JSON array
+uwb_range_topics:         '["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]'

@@ -1,4 +1,7 @@
-[![Build Status](https://travis-ci.com/TIERS/offboard-control.svg?branch=main)](https://travis-ci.com/TIERS/offboard-control)
+
+
+![ROS Melodic build badge](https://github.com/TIERS/offboard-control/actions/workflows/main.yml/badge.svg)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Offboard control

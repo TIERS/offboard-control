@@ -1,0 +1,17 @@
+# Pose topics
+# in JSON array
+pose_topics:        '["/dwm1001/tag/dronie/position/pf/O", "/dwm1001/tag/dronie/position/pf/P"]'
+out_topic:          '/dwm1001/tag/dronie/position/pf'
+
+# Pose translations (how to average them)
+# in JSON array
+pose_translations:  '[[-0.1, 0.35, 0], [-0.1, -0.35, 0]]'
+
+# Pose weights (to choose if there are more reliable poses)
+# in JSON array
+# (sum should be one)
+pose_weights:       '[0.5, 0.5]'
+
+# Publish freq
+publish_freq:       6
+max_pos_delay:      0.2
