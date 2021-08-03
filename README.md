@@ -6,7 +6,7 @@
 
 | Status  |
 |---------|
-| ![ROS Melodic build badge](https://github.com/TIERS/tiers-ros-msgs/actions/workflows/melodic.yml/badge.svg) |
+| ![ROS Melodic build badge](https://github.com/TIERS/offboard-control/actions/workflows/melodic.yml/badge.svg) |
 
 
 ## Description
