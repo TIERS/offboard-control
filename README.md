@@ -1,11 +1,16 @@
 
-
-![ROS Melodic build badge](https://github.com/TIERS/offboard-control/actions/workflows/melodic.yml/badge.svg)
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Offboard control
 # PX4+MAVROS with UWB+VIO localization
+
+
+| Status  |
+|---------|
+| ![ROS Melodic build badge](https://github.com/TIERS/tiers-ros-msgs/actions/workflows/melodic.yml/badge.svg) |
+
+
+## Description
 
 Offboard controller for PX4 flight controllers with MAVROS. Uses UWB+VIO for localizartion in GNSS-denied environments.
 
