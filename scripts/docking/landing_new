@@ -15,7 +15,7 @@ from sensor_msgs.msg    import Range
 
 from geometry_msgs.msg  import PoseStamped
 
-from offboard_control.srv  import flight_mode as OffMode
+from tiers_ros_msgs.srv  import flight_mode as OffMode
 
 class LandingControl() :
     '''
@@ -95,6 +95,7 @@ class LandingControl() :
         rospy.loginfo("Home position locked: \n{}".format(self.pos.pose))
 
         # UWB Subscribers
+        self.accumulate_meas = rospy.get_param("~accumulate_meas", False)
         self.use_absolute_uwb = rospy.get_param("~use_absolute_uwb", True)
         self.uav_uwb_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
         self.ugv_uwb_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
@@ -138,8 +139,8 @@ class LandingControl() :
         self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
 
         # Service for changing to external offboard mode
-        self.pub_state_mode = rospy.Publisher("/uav/offboard/mode/change", String, queue_size=10)
-        self.set_ofboard_mode_client  = rospy.ServiceProxy("/uav/offboard/cmd/mode", OffMode)
+        self.pub_state_mode = rospy.Publisher("/uav0/offboard/mode/change", String, queue_size=10)  # TODO use param
+        self.set_ofboard_mode_client  = rospy.ServiceProxy("/uav0/offboard/cmd/mode", OffMode)
 
         # 1D lidar (height)
         self.lidarz = 0.3
@@ -332,10 +333,10 @@ class LandingControl() :
             if rospy.Time.now() - self.ugv_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
                 self.publishing_objective = False
                 rospy.logwarn("Not receiving UGV UWB pose updates...")
-            elif rospy.Time.now() - self.uav_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay)  and not self.using_custom_uwb :
+            elif rospy.Time.now() - self.uav_uwb_pos.header.stamp > rospy.Duration(self.max_pos_delay) :
                 self.publishing_objective = False
                 rospy.logwarn("Not receiving UAV UWB pose updates...")
-            elif rospy.Time.now() - self.pos.header.stamp > rospy.Duration(self.max_pos_delay)  and not self.using_custom_uwb :
+            elif rospy.Time.now() - self.pos.header.stamp > rospy.Duration(self.max_pos_delay) :
                 self.publishing_objective = False
                 rospy.logwarn("Not receiving MAVROS local POS update...")
             else :
@@ -353,7 +354,7 @@ class LandingControl() :
                 if self.dist_to_target > self.landing_dist :
                     move_dir = 0.666 * self.waypoint_step * move_dir / self.dist_to_target
                 else :
-                    if self.using_custom_uwb :
+                    if not self.accumulate_meas :
                         move_dir = self.waypoint_step * move_dir / self.dist_to_target
                     else : 
                         ugv_poses = numpy.array([[
