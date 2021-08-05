@@ -139,8 +139,10 @@ class LandingControl() :
         self.offbord_state_sub = rospy.Subscriber(self.offboard_state_topic, String, self.update_offboard_state_cb)
 
         # Service for changing to external offboard mode
-        self.pub_state_mode = rospy.Publisher("/uav0/offboard/mode/change", String, queue_size=10)  # TODO use param
-        self.set_ofboard_mode_client  = rospy.ServiceProxy("/uav0/offboard/cmd/mode", OffMode)
+        self.state_mode_topic = rospy.get_param("~change_mode_topic", "/uav0/offboard/mode/change")
+        self.change_mode_service = rospy.get_param("~change_mode_service", "/uav0/offboard/cmd/mode")
+        self.pub_state_mode = rospy.Publisher(self.state_mode_topic, String, queue_size=10)
+        self.set_ofboard_mode_client  = rospy.ServiceProxy(self.change_mode_service, OffMode)
 
         # 1D lidar (height)
         self.lidarz = 0.3
