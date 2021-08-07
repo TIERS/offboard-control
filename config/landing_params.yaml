@@ -1,12 +1,13 @@
 uav_uwb_topic:          "/dwm1001/tag/dronie/position"
-ugv_uwb_topic:          "/dwm1001/tag/ugv/position"
+ugv_uwb_topic:          "/dwm1001/tag/dashgo/position"
 
 ugv_vio_topic:          "/ugv/t265/odom/sample_throttled"
-uav_vio_topic:          "/uav/t265/odom/sample"
+uav_vio_topic:          "/uav_ground_truth"
 
 local_pos_topic:        "mavros/local_position/pose"
 waypoint_pub_topic:     "offboard/command_waypoint"
 change_mode_topic:      "offboard/mode/change"
+change_mode_service:    "offboard/cmd/mode"
 offboard_state_topic:   "offboard/state"
 offboard_mode_topic:    "offboard/mode"
 
@@ -36,6 +37,7 @@ max_landing_trials :    2
 min_landing_stay:       8
 min_home_stay:          2
 
+accumulate_meas:        False
 use_absolute_uwb:       False
 use_relative_uwb:       True
 relative_uwb_suffix:    "/mlat"

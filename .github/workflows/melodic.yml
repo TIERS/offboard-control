@@ -25,6 +25,7 @@ jobs:
         env:
           - {ROS_DISTRO: melodic, ROS_REPO: main}
     env:
+      UPSTREAM_WORKSPACE: 'github:tiers/tiers-ros-msgs#HEAD'
       CCACHE_DIR: /github/home/.ccache # Directory for ccache (and how we enable ccache in industrial_ci)
     runs-on: ubuntu-18.04
     steps:
