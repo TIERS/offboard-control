@@ -94,6 +94,9 @@ private:
 
     std::string offboard_state_;
 
+    bool automatic_arming_;
+    bool automatic_offboard_mode_;
+
 public:
     safe_offboard(ros::NodeHandle& nh);
     ~safe_offboard();

@@ -52,6 +52,9 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     std::string flight_mode_srv_topic;
     std::string offboard_state_srv_topic;
 
+    nhh.param<bool>("automatic_arming", automatic_arming_, false);
+    nhh.param<bool>("automatic_offboard_mode", automatic_offboard_mode_, false);
+
     nhh.param<std::string>("mavros_state_sub_topic", mavros_state_sub_topic, "mavros/state");
     nhh.param<std::string>("mavros_position_sub_topic", mavros_position_sub_topic, "mavros/vision_pose/pose");
     nhh.param<std::string>("external_waypoint_sub_topic", external_waypoint_sub_topic, "offboard/command_waypoint");
@@ -542,37 +545,32 @@ void safe_offboard::run()
 
     ros::Time last_request = ros::Time::now();
 
-    while(ros::ok()){
-		// if( current_state_.mode != "OFFBOARD" &&
-		// 		(ros::Time::now() - last_request > ros::Duration(2.0))){
-		// 		if( set_mode_client_.call(offb_set_mode_) &&
-		// 				offb_set_mode_.response.mode_sent){
-		// 				ROS_INFO_STREAM("Offboard Enabled");
-		// 		}
-		// 		last_request = ros::Time::now();
-		// } else {
-		// 		if( !current_state_.armed &&
-		// 				(ros::Time::now() - last_request > ros::Duration(2.0))){
-		// 				if( arming_client_.call(arm_cmd_) &&
-		// 						arm_cmd_.response.success){
-		// 						ROS_INFO_STREAM("Vehicle Armed");
-		// 				}
-		// 				last_request = ros::Time::now();
-		// 		}
-        //         // else if(current_state_.armed){
-                    
-        //         // }
-		// }
-        // 
+    while(ros::ok()) {
+        
+        // Switch to offboard and arm
+        // TODO check the drone is on the ground
+		if( automatic_offboard_mode_ && current_state_.mode != "OFFBOARD" &&
+				(ros::Time::now() - last_request > ros::Duration(2.0))){
+				if( set_mode_client_.call(offb_set_mode_) &&
+						offb_set_mode_.response.mode_sent){
+						ROS_INFO_STREAM("Offboard Enabled");
+				}
+				last_request = ros::Time::now();
+		} else if (automatic_arming_) {
+				if( !current_state_.armed &&
+						(ros::Time::now() - last_request > ros::Duration(2.0))){
+						if( arming_client_.call(arm_cmd_) &&
+								arm_cmd_.response.success){
+								ROS_INFO_STREAM("Vehicle Armed");
+						}
+						last_request = ros::Time::now();
+				}
+		}
+
         ros::spinOnce();
 		rate.sleep();
     }
 
-
-    // for(size_t i = 0; i < 10; i++){
-    //     // land*
-    //     safe_offboard::safe_offboard::::p(0.1);
-    // }
 }
 
 int main(int argc, char **argv)

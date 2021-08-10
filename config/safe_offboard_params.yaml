@@ -1,3 +1,7 @@
+
+automatic_offboard_mode:      true
+automatic_arming:             true
+
 mavros_state_sub_topic:       "mavros/state"
 mavros_position_sub_topic:    "mavros/vision_pose/pose"
 external_waypoint_sub_topic:  "offboard/command_waypoint"
@@ -12,11 +16,10 @@ flight_mode_sub_topic:        "offboard/mode/change"
 flight_mode_srv_topic:        "offboard/cmd/mode"
 offboard_state_srv_topic:     "offboard/cmd/state"
 
-fly_time:             40
-flight_mode:          "stay"
-takeoff_height:       1.0
-circle_radius:        0.6
-square_side:          2
-pos_valid_time:       1.0
-waypoint_valid_time:  1.0
-fly_fence:            [-2.5, -3.5, 0.0, 1, 4, 1.9]
+flight_mode:                  "stay"
+takeoff_height:               1.0
+circle_radius:                0.6
+square_side:                  2
+pos_valid_time:               1.0
+waypoint_valid_time:          1.0
+fly_fence:                    [-25, -35, 0.0, 25, 40, 19]
