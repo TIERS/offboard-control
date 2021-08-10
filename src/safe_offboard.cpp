@@ -71,8 +71,6 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     nhh.param<std::string>("flight_mode_srv_topic", flight_mode_srv_topic, "offboard/cmd/mode");
     nhh.param<std::string>("offboard_state_srv_topic", offboard_state_srv_topic, "offboard/state");
 
-
-
     state_sub_ = nh_.subscribe<mavros_msgs::State>(mavros_state_sub_topic, 10, &safe_offboard::state_cb, this);
     position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>(mavros_position_sub_topic, 10, &safe_offboard::update_current_pos, this);
     external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>(external_waypoint_sub_topic, 10, &safe_offboard::update_external_waypoint, this);
@@ -88,6 +86,16 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
 
     flight_mode_srv_ = nh_.advertiseService(flight_mode_srv_topic, &safe_offboard::flight_mode_srv_cb, this);
     offboard_state_srv_ = nh_.advertiseService(offboard_state_srv_topic, &safe_offboard::offboard_state_srv_cb, this);
+
+    ROS_INFO_STREAM("Waiting for external position...");
+    ros::Rate rate(2.0);
+    while ( !check_ext_position() )
+    {
+        ROS_INFO_STREAM("Waiting for external position...");
+        ros::spinOnce();
+		rate.sleep();
+    }
+
 }
 
 safe_offboard::~safe_offboard()
@@ -244,10 +252,14 @@ bool safe_offboard::check_ext_position(){
         current_pos_.pose.position.y == -1 &&
         current_pos_.pose.position.z == -1)
     {
-        ROS_ERROR_STREAM("Check If the External Positioning Is Working");
+        ROS_ERROR_STREAM("External position still -1,-1,-1......");
         return false;
     }
-    home_pos_ = current_pos_;
+    else
+    {
+        set_home_pos(current_pos_);
+        return true;
+    }
 }
 
 bool safe_offboard::check_inside_fly_fence(double x, double y, double z){
@@ -441,7 +453,7 @@ void safe_offboard::set_square_side(double square_side)
 void safe_offboard::set_home_pos(geometry_msgs::PoseStamped& pose)
 {
     home_pos_ = pose;
-    ROS_INFO_STREAM("Home Position set to (" << pose.pose.position.x << " , "
+    ROS_INFO_STREAM(" -> Home position set to (" << pose.pose.position.x << " , "
                     << pose.pose.position.y << " , "
                     << pose.pose.position.z << ")");
 }
