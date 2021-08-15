@@ -29,12 +29,8 @@ class UWBLeastSquares() :
         rospy.init_node('UWB_Least_Squares', anonymous=False)
 
         # Responder positions
-        self.responder_offsets = numpy.array([
-            [0, 0, 0.23],
-            [0, 0.56, 0.23],
-            [0.56, 0.56, 0.23],
-            [0.56, 0, 0.23]
-        ])
+        uwb_responder_offsets = rospy.get_param("~responder_offsets", [[0],[0],[0]])
+        self.responder_offsets = numpy.array(uwb_responder_offsets)
 
         self.pos = PoseStamped()
         self.uav_uwb_pos = PoseStamped()
@@ -73,6 +69,10 @@ class UWBLeastSquares() :
                 rospy.Subscriber(topic, Float64, self.uwb_range_cb, idx)
             )
 
+        # Mavros local pos subscriber callback
+        self.uav_vio_topic = rospy.get_param("~uav_vio_topic", "/uav0/mavros/vision_pose/pose")
+        self.update_pos_sub = rospy.Subscriber(self.uav_vio_topic, PoseStamped, self.update_pos_cb)
+
         # UWB Publishers
         uav_uwb_pos_publish_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
         ugv_uwb_pos_publish_topic = rospy.get_param("~ugv_uwb_topic", "/dwm1001/tag/dashgo/position")
@@ -81,6 +81,12 @@ class UWBLeastSquares() :
         self.uav_uwb_fake_publisher = rospy.Publisher(uav_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
         self.ugv_uwb_fake_publisher = rospy.Publisher(ugv_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
 
+    def update_pos_cb(self, pos) :
+        '''
+            Update position from VIO pipeline being fed to mavros
+        '''
+        self.pos = pos
+    
     def uwb_range_cb(self, range, idx) :
         '''
             Update UWB range to responder ID given by args[0]
@@ -97,7 +103,7 @@ class UWBLeastSquares() :
             Assumes one transceiver on the UAV side, and 2/3/4 transceivers on the UGV.
             Uses least squares optimization.
         '''
-        ground_distances = self.uwb_ranges[:3] * numpy.cos( numpy.arcsin( (self.pos.pose.position.z - 0.35) / self.uwb_ranges[:3]) )
+        ground_distances = self.uwb_ranges[:3] * numpy.cos( numpy.arcsin( (self.pos.pose.position.z) / self.uwb_ranges[:3]) )
         
         if not self.uav_uwb_pos.header.stamp :
             # uav_pos, uav_err = relative_position_from_four_meas(ground_distances)

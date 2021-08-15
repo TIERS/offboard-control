@@ -52,6 +52,9 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     std::string flight_mode_srv_topic;
     std::string offboard_state_srv_topic;
 
+    nhh.param<bool>("automatic_arming", automatic_arming_, false);
+    nhh.param<bool>("automatic_offboard_mode", automatic_offboard_mode_, false);
+
     nhh.param<std::string>("mavros_state_sub_topic", mavros_state_sub_topic, "mavros/state");
     nhh.param<std::string>("mavros_position_sub_topic", mavros_position_sub_topic, "mavros/vision_pose/pose");
     nhh.param<std::string>("external_waypoint_sub_topic", external_waypoint_sub_topic, "offboard/command_waypoint");
@@ -68,8 +71,6 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
     nhh.param<std::string>("flight_mode_srv_topic", flight_mode_srv_topic, "offboard/cmd/mode");
     nhh.param<std::string>("offboard_state_srv_topic", offboard_state_srv_topic, "offboard/state");
 
-
-
     state_sub_ = nh_.subscribe<mavros_msgs::State>(mavros_state_sub_topic, 10, &safe_offboard::state_cb, this);
     position_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>(mavros_position_sub_topic, 10, &safe_offboard::update_current_pos, this);
     external_waypoint_cb_ = nh_.subscribe<geometry_msgs::PoseStamped>(external_waypoint_sub_topic, 10, &safe_offboard::update_external_waypoint, this);
@@ -85,6 +86,16 @@ safe_offboard::safe_offboard(ros::NodeHandle& nh)
 
     flight_mode_srv_ = nh_.advertiseService(flight_mode_srv_topic, &safe_offboard::flight_mode_srv_cb, this);
     offboard_state_srv_ = nh_.advertiseService(offboard_state_srv_topic, &safe_offboard::offboard_state_srv_cb, this);
+
+    ROS_INFO_STREAM("Waiting for external position...");
+    ros::Rate rate(2.0);
+    while ( !check_ext_position() )
+    {
+        ROS_INFO_STREAM("Waiting for external position...");
+        ros::spinOnce();
+		rate.sleep();
+    }
+
 }
 
 safe_offboard::~safe_offboard()
@@ -241,10 +252,14 @@ bool safe_offboard::check_ext_position(){
         current_pos_.pose.position.y == -1 &&
         current_pos_.pose.position.z == -1)
     {
-        ROS_ERROR_STREAM("Check If the External Positioning Is Working");
+        ROS_ERROR_STREAM("External position still -1,-1,-1......");
         return false;
     }
-    home_pos_ = current_pos_;
+    else
+    {
+        set_home_pos(current_pos_);
+        return true;
+    }
 }
 
 bool safe_offboard::check_inside_fly_fence(double x, double y, double z){
@@ -438,7 +453,7 @@ void safe_offboard::set_square_side(double square_side)
 void safe_offboard::set_home_pos(geometry_msgs::PoseStamped& pose)
 {
     home_pos_ = pose;
-    ROS_INFO_STREAM("Home Position set to (" << pose.pose.position.x << " , "
+    ROS_INFO_STREAM(" -> Home position set to (" << pose.pose.position.x << " , "
                     << pose.pose.position.y << " , "
                     << pose.pose.position.z << ")");
 }
@@ -542,37 +557,32 @@ void safe_offboard::run()
 
     ros::Time last_request = ros::Time::now();
 
-    while(ros::ok()){
-		// if( current_state_.mode != "OFFBOARD" &&
-		// 		(ros::Time::now() - last_request > ros::Duration(2.0))){
-		// 		if( set_mode_client_.call(offb_set_mode_) &&
-		// 				offb_set_mode_.response.mode_sent){
-		// 				ROS_INFO_STREAM("Offboard Enabled");
-		// 		}
-		// 		last_request = ros::Time::now();
-		// } else {
-		// 		if( !current_state_.armed &&
-		// 				(ros::Time::now() - last_request > ros::Duration(2.0))){
-		// 				if( arming_client_.call(arm_cmd_) &&
-		// 						arm_cmd_.response.success){
-		// 						ROS_INFO_STREAM("Vehicle Armed");
-		// 				}
-		// 				last_request = ros::Time::now();
-		// 		}
-        //         // else if(current_state_.armed){
-                    
-        //         // }
-		// }
-        // 
+    while(ros::ok()) {
+        
+        // Switch to offboard and arm
+        // TODO check the drone is on the ground
+		if( automatic_offboard_mode_ && current_state_.mode != "OFFBOARD" &&
+				(ros::Time::now() - last_request > ros::Duration(2.0))){
+				if( set_mode_client_.call(offb_set_mode_) &&
+						offb_set_mode_.response.mode_sent){
+						ROS_INFO_STREAM("Offboard Enabled");
+				}
+				last_request = ros::Time::now();
+		} else if (automatic_arming_) {
+				if( !current_state_.armed &&
+						(ros::Time::now() - last_request > ros::Duration(2.0))){
+						if( arming_client_.call(arm_cmd_) &&
+								arm_cmd_.response.success){
+								ROS_INFO_STREAM("Vehicle Armed");
+						}
+						last_request = ros::Time::now();
+				}
+		}
+
         ros::spinOnce();
 		rate.sleep();
     }
 
-
-    // for(size_t i = 0; i < 10; i++){
-    //     // land*
-    //     safe_offboard::safe_offboard::::p(0.1);
-    // }
 }
 
 int main(int argc, char **argv)

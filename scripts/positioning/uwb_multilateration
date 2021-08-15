@@ -26,12 +26,8 @@ class UWBMultiLateration():
         rospy.init_node('UWB_Multilateration', anonymous = True)
 
         # Responder positions
-        self.responder_offsets = numpy.array([
-            [0, 0, 0.23],
-            [0, 0.56, 0.23],
-            [0.56, 0.56, 0.23],
-            [0.56, 0, 0.23]
-        ])
+        uwb_responder_offsets = rospy.get_param("~responder_offsets", [[0],[0],[0]])
+        self.responder_offsets = numpy.array(uwb_responder_offsets)
 
         self.pos = PoseStamped()
         self.uav_uwb_pos = PoseStamped()
@@ -39,30 +35,19 @@ class UWBMultiLateration():
         self.ugv_uwb_pos = PoseStamped()
         self.ugv_uwb_pos_acc = [PoseStamped()]*10
 
-        # Custom one-to-four and two-to-four UWB ranging
+        # Custom one-to-many UWB ranging
         self.uwb_range_offset = rospy.get_param("~uwb_range_offset", 0.27)
-        # self.custom_uwb_ranges = numpy.ones(4)
-        # self.custom_uwb_stamps = [rospy.Time()] * 4
-
-        # self.second_custom_uwb_ranges = numpy.ones(4)
-        # self.second_custom_uwb_stamps = [rospy.Time()] * 4
 
         self.using_custom_uwb = rospy.get_param("~using_custom_uwb", False)    # Do not use Decawave's DRTLS
         self.min_uwb_ranges = False     # At least 2 transceivers should be active...
 
-        self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.6)
-        self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.6)
-        self.ugv_xoffset = rospy.get_param("~custom_uwb_xoffset", 0.3)
-        self.ugv_yoffset = rospy.get_param("~custom_uwb_yoffset", 0.3)
-        
-        # defualt_uwb_range_o2 = ["/dwm1001/O2A/distance", "/dwm1001/O2B/distance", "/dwm1001/O2C/distance", "/dwm1001/O2D/distance"]
-        # defualt_uwb_range_p2 = ["/dwm1001/P2A/distance", "/dwm1001/P2B/distance", "/dwm1001/P2C/distance", "/dwm1001/P2D/distance"]
-        # self.uwb_range_o2 = rospy.get_param("~uwb_range_o2", defualt_uwb_range_o2)
-        # self.uwb_range_p2 = rospy.get_param("~uwb_range_p2", defualt_uwb_range_p2)
+        self.ugv_x0 = rospy.get_param("~custom_uwb_xsep", 0.4)
+        self.ugv_y0 = rospy.get_param("~custom_uwb_ysep", 0.4)
+        self.ugv_xoffset = rospy.get_param("~ugv_xoffset", 0.3)
+        self.ugv_yoffset = rospy.get_param("~ugv_yoffset", 0.3)
 
         self.max_pos_delay = rospy.get_param("~max_pos_delay", 0.2)
 
-        # rospy.loginfo("uwb: {}, {}".format(self.uwb_range_o2[0], self.uwb_range_o2[0]))
         # UWB pairs to calculate relative pos and average
         # 3rd element means x is calculated with cos (+1) or sin (-1)
         # 4th, 5th elements have to be added to x,y respectively
@@ -89,6 +74,10 @@ class UWBMultiLateration():
                 rospy.Subscriber(topic, Float64, self.uwb_range_cb, idx)
             )
 
+        # Mavros local pos subscriber callback
+        self.uav_vio_topic = rospy.get_param("~uav_vio_topic", "/uav0/mavros/vision_pose/pose")
+        self.update_pos_sub = rospy.Subscriber(self.uav_vio_topic, PoseStamped, self.update_pos_cb)
+
 
         # UWB Publishers
         uav_uwb_pos_publish_topic = rospy.get_param("~uav_uwb_topic", "/dwm1001/tag/dronie/position")
@@ -98,6 +87,11 @@ class UWBMultiLateration():
         self.uav_uwb_fake_publisher = rospy.Publisher(uav_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
         self.ugv_uwb_fake_publisher = rospy.Publisher(ugv_uwb_pos_publish_topic+uwb_topic_suffix, PoseStamped, queue_size=10)
 
+    def update_pos_cb(self, pos) :
+        '''
+            Update position from VIO pipeline being fed to mavros
+        '''
+        self.pos = pos
 
     def uwb_range_cb(self, range, idx) :
         '''
