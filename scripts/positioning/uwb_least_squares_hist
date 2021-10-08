@@ -18,7 +18,7 @@ class UWBLeastSquaresHist() :
     '''
         ROS Node that estimates position of a single or a set of UWB initiators
         with respect to a set of responders in known positions. It uses a least square
-        method to estimate the position.
+        method to estimate the position (assumulating multiple readings along time).
     '''
 
     def __init__(self) :
