@@ -1,6 +1,6 @@
 <launch>
 
-    <node name="mavros_cmd_vel" pkg="offboard_control" type="mavros_cmd_vel_node" respawn="true" output="screen">
+    <node name="mavros_joy_cmd_vel" pkg="offboard_control" type="mavros_joy_cmd_vel" respawn="true" output="screen">
         <rosparam file="$(find offboard_control)/config/control.yaml" command="load"/>
     </node>
 

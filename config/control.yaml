@@ -3,6 +3,7 @@ velocity_multiplier:          1.5
 
 controller_mode:              "joy"
 
+joy_sub_topic:                "joy"
 cmd_vel_sub_topic:            "cmd/vel"
 
 mavros_local_pos_sub_topic:   "mavros/local_position/pose"
