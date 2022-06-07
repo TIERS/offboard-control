@@ -3,20 +3,15 @@
 import sys
 import time
 import rospy
+import numpy as np
 
 from sensor_msgs.msg     import Joy
 
 from geometry_msgs.msg     import Twist
-from geometry_msgs.msg     import PoseStamped
+from geometry_msgs.msg     import PoseStamped, Quaternion
 
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
-#
-# Params to read
-#
-# mavros_local_pos_sub_topic
-# mavros_state_sub_topic
-# mavros_position_sub_topic
-# mavros_waypoint_pub_topic
 
 class CMD_Vel_MAVROS_Controller :
 
@@ -52,7 +47,7 @@ class CMD_Vel_MAVROS_Controller :
         self.cmd_vel_topic =  rospy.get_param("~cmd_vel_sub_topic", "/cmd_vel")
         rospy.loginfo("Subscribing to twist commands at {}".format(self.cmd_vel_topic))
 
-        self.cmd_vel_sub = rospy.Subscriber(self.cmd_vel_topic, Twist, self.local_pos_cb)
+        self.cmd_vel_sub = rospy.Subscriber(self.cmd_vel_topic, Twist, self.cmd_vel_cb)
 
         # Subscribe to Joy node
         self.joy = Joy()
@@ -63,14 +58,21 @@ class CMD_Vel_MAVROS_Controller :
         self.joy_sub = rospy.Subscriber(self.joy_topic, Joy, self.joy_cb)
 
         # Publish data
-        self.waypoint_pub = rospy.Publisher('/mavros/vision_pose/pose', PoseStamped, queue_size=10)
+        self.waypoint_pub = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        self.yaw = 0
 
-        
     def local_pos_cb(self, pos) :
         '''
             Update position from mavros local pose (callback)
         '''
         self.pos = pos
+
+    def get_yaw(self):
+        quat = Quaternion()
+        quat = self.pos.pose.orientation 
+        quat_np = np.array([quat.x, quat.y, quat.z, quat.w])
+        _, _, yaw = euler_from_quaternion(quat_np)
+        return yaw
     
     def cmd_vel_cb(self, vel) :
         '''
@@ -86,18 +88,21 @@ class CMD_Vel_MAVROS_Controller :
         self.joy = joy_msg
 
     def update_command(self, tmr) :
-
+        self.yaw = self.get_yaw()
         sys.stdout.write("\rLocal posiiton is [{:.1f}, {:.1f}, {:.1f}] ... ".format(
                 self.pos.pose.position.x,
                 self.pos.pose.position.y,
-                self.pos.pose.position.z
+                self.pos.pose.position.z,
+                self.yaw
             ))
         
+        new_yaw = 0
         new_pose = PoseStamped()
         if self.joy.header.seq > self.last_joy_seq :
 
-            new_pose.pose = self.pos.pose
+            new_pose = self.pos
             self.last_joy_seq = self.joy.header.seq
+            self.command_pos = self.pos
             up_down = self.joy.axes [1]
             left_right = self.joy.axes[2]
             forward_backwards = self.joy.axes[3]
@@ -106,12 +111,20 @@ class CMD_Vel_MAVROS_Controller :
             sys.stdout.write(" ... joy [{:.1f}, {:.1f}, {:.1f}] received ...".format(
                     up_down, 
                     forward_backwards, 
-                    left_right
+                    left_right,
+                    yaw_rotate
                 ))
 
             new_pose.pose.position.x = new_pose.pose.position.x + self.speed_multiplier * forward_backwards
             new_pose.pose.position.y = new_pose.pose.position.y - self.speed_multiplier * left_right           # TODO Double check
             new_pose.pose.position.z = new_pose.pose.position.z + self.speed_multiplier * up_down
+            new_yaw = self.yaw + 0.2* self.speed_multiplier * yaw_rotate
+            new_quat = quaternion_from_euler(0, 0, new_yaw)
+            new_pose.pose.orientation.x = new_quat[0]
+            new_pose.pose.orientation.y = new_quat[1]
+            new_pose.pose.orientation.z = new_quat[2]
+            new_pose.pose.orientation.w = new_quat[3]
+
             if new_pose.pose.position.z < 0 :
                 new_pose.pose.position.z = 0
         
@@ -124,7 +137,8 @@ class CMD_Vel_MAVROS_Controller :
         sys.stdout.write(" ... going to [{:.1f}, {:.1f}, {:.1f}]".format(
                 new_pose.pose.position.x,
                 new_pose.pose.position.y,
-                new_pose.pose.position.z
+                new_pose.pose.position.z,
+                new_yaw
             ))
 
         self.waypoint_pub.publish(new_pose)
@@ -164,4 +178,3 @@ if __name__ == '__main__':
     except rospy.ROSInterruptException:
 
         pass
-
